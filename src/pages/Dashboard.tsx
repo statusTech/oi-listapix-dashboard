@@ -19,7 +19,7 @@ export function Dashboard() {
     api
       .get<DashboardOverview>("/admin/listapix-dashboard/overview")
       .then((response) => setData(response.data))
-      .catch(() => setError("Nao foi possivel carregar o dashboard."));
+      .catch(() => setError("Não foi possível carregar o dashboard."));
   }, []);
 
   function toggleExpanded(clientId: string) {
@@ -57,7 +57,7 @@ export function Dashboard() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm text-neutral-500">Nao splitados</CardTitle>
+            <CardTitle className="text-sm text-neutral-500">Não splitados</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-semibold">{data.summary.totalNaoSplitados}</CardContent>
         </Card>
@@ -82,7 +82,7 @@ export function Dashboard() {
                 <TableCell>{formatCurrency(client.totalVendido)}</TableCell>
                 <TableCell>{formatCurrency(client.totalTaxas)}</TableCell>
                 <TableCell>
-                  <Badge variant={client.split ? "default" : "secondary"}>{client.split ? "Sim" : "Nao"}</Badge>
+                  <Badge variant={client.split ? "default" : "secondary"}>{client.split ? "Sim" : "Não"}</Badge>
                 </TableCell>
               </TableRow>
               {expanded.has(client.clientId) &&
