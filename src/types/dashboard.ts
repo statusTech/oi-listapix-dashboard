@@ -4,6 +4,9 @@ export interface EventTotals {
   totalVendido: number;
   totalTaxas: number;
   totalItens: number;
+  totalTransacoes: number;
+  transacoesMesaCamarote: number;
+  transacoesIngresso: number;
 }
 
 export interface ClientOverview {
@@ -13,6 +16,9 @@ export interface ClientOverview {
   totalVendido: number;
   totalTaxas: number;
   totalItens: number;
+  totalTransacoes: number;
+  transacoesMesaCamarote: number;
+  transacoesIngresso: number;
   events: EventTotals[];
 }
 

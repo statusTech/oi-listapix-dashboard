@@ -16,6 +16,29 @@ function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function TransacoesCell({
+  total,
+  mesaCamarote,
+  ingresso,
+  small,
+}: {
+  total: number;
+  mesaCamarote: number;
+  ingresso: number;
+  small?: boolean;
+}) {
+  return (
+    <div className={small ? "text-sm" : undefined}>
+      <span>{total}</span>
+      {mesaCamarote > 0 && (
+        <span className="ml-1.5 text-xs text-neutral-500">
+          ({ingresso} ingresso, {mesaCamarote} mesa/camarote)
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function Dashboard() {
   const { logout } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
@@ -137,6 +160,7 @@ export function Dashboard() {
               <TableRow>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Eventos ativos</TableHead>
+                <TableHead>Transações</TableHead>
                 <TableHead>Total vendido</TableHead>
                 <TableHead>Total de taxas</TableHead>
                 <TableHead>Split</TableHead>
@@ -145,7 +169,7 @@ export function Dashboard() {
             <TableBody>
               {filteredClients.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
+                  <TableCell colSpan={6} className="text-center text-sm text-neutral-500">
                     Nenhum cliente encontrado.
                   </TableCell>
                 </TableRow>
@@ -155,6 +179,13 @@ export function Dashboard() {
                   <TableRow className="cursor-pointer" onClick={() => toggleExpanded(client.clientId)}>
                     <TableCell>{client.name}</TableCell>
                     <TableCell>{client.events.length}</TableCell>
+                    <TableCell>
+                      <TransacoesCell
+                        total={client.totalTransacoes}
+                        mesaCamarote={client.transacoesMesaCamarote}
+                        ingresso={client.transacoesIngresso}
+                      />
+                    </TableCell>
                     <TableCell>{formatCurrency(client.totalVendido)}</TableCell>
                     <TableCell>{formatCurrency(client.totalTaxas)}</TableCell>
                     <TableCell>
@@ -166,6 +197,14 @@ export function Dashboard() {
                       <TableRow key={event.eventId} className="bg-neutral-50">
                         <TableCell className="pl-8 text-sm text-neutral-600">{event.name}</TableCell>
                         <TableCell />
+                        <TableCell>
+                          <TransacoesCell
+                            total={event.totalTransacoes}
+                            mesaCamarote={event.transacoesMesaCamarote}
+                            ingresso={event.transacoesIngresso}
+                            small
+                          />
+                        </TableCell>
                         <TableCell className="text-sm">{formatCurrency(event.totalVendido)}</TableCell>
                         <TableCell className="text-sm">{formatCurrency(event.totalTaxas)}</TableCell>
                         <TableCell />
