@@ -52,7 +52,19 @@ export function Dashboard() {
         </Button>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-neutral-500">Total vendido</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{formatCurrency(data.summary.totalVendidoGeral)}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-neutral-500">Total de taxas</CardTitle>
+          </CardHeader>
+          <CardContent className="text-2xl font-semibold">{formatCurrency(data.summary.totalTaxasGeral)}</CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="text-sm text-neutral-500">Clientes ativos</CardTitle>

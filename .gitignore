@@ -9,3 +9,5 @@ vite.config.d.ts
 .vscode
 .idea
 *.log
+.vercel
+.env*

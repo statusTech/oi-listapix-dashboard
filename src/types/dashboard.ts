@@ -22,6 +22,8 @@ export interface DashboardOverview {
     totalClientesAtivos: number;
     totalSplitados: number;
     totalNaoSplitados: number;
+    totalVendidoGeral: number;
+    totalTaxasGeral: number;
   };
   clients: ClientOverview[];
 }
