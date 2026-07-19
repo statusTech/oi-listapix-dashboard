@@ -39,12 +39,17 @@ Não "resolver" isso migrando pra Tailwind v4 sem avaliar o custo — funciona h
 - **Split**: `eCommerce.hasSplit === true` — **não** `eCommerce.chargeClient`. `chargeClient` é conceito de billing (quem paga a taxa administrativa), diferente de "split configurado de fato" (toggle "Split" do `admin.oitickets.com.br`). Corrigido depois que um cliente real (Sociedade Vera Cruz) mostrou `chargeClient: true` + `hasSplit: false` com o painel admin marcando Split desligado — o dashboard mostrava "Sim" errado até a correção.
 - **Valores monetários**: `orderproducts.price_total`/`tax_value` são armazenados em **centavos** no banco (confirmado contra `server-node-backend/src/controllers/PaymentController.js:638-645`, que usa o mesmo padrão e nomeia a variável `totalCentavos`). `computeEventTotals` (`server-node-backend/src/services/listaPixDashboard/eventTotals.js`) divide por 100 antes de retornar — se algum código novo ler essas colunas direto, não esquecer da conversão.
 
+### Transações por evento (ingresso vs mesa/camarote)
+
+`countEventTransactions` (`server-node-backend/src/services/listaPixDashboard/eventTotals.js`) conta pedidos validados distintos por evento (`COUNT DISTINCT order_oid`), separando os que têm ≥1 item de mesa/camarote (`ecommerce_products.mesa_layout_id IS NOT NULL`) dos demais. Pedido misto (ingresso + mesa na mesma compra) conta só como mesa, nunca duplicado. Eventos criados antes da migration `add_mesa_columns_to_ecommerce_products` (2026-06-28) não têm a coluna `mesa_layout_id` — tratados como "sem mesas" via try/catch, não quebram o cálculo. **Isso ainda não foi validado com um evento real que tenha mesa/camarote de fato** — os dois tenants de teste local (Status Tech, Sociedade Vera Cruz) não têm mesas materializadas, então `transacoesMesaCamarote` sempre deu 0 nos testes manuais. Validar isso quando houver um evento real com mesa/camarote no ar.
+
 ### Deploy
 
 - Vercel: projeto `fnsystems/listapix-dashboard`, produção em `https://listapix-dashboard.vercel.app`. Domínio customizado `admin.listapix.com` planejado mas DNS ainda não configurado (pendência manual, precisa de acesso ao provedor de DNS — não é algo que o agente resolve sozinho).
 - Env vars de produção (8x `VITE_FIREBASE_*` + `VITE_API_BASE_URL`) configuradas direto no dashboard da Vercel via `vercel env add`, não existem no repo (só em `.env.local`, gitignored).
 - `vercel.json` na raiz: rewrite de SPA (`/(.*)` → `/index.html`) — sem isso, refresh em `/login` ou qualquer rota que não seja `/` dá 404 no Vercel.
 - CORS de produção: `server-node-backend/src/index.js` (`allowedOrigins`) já libera `https://listapix-dashboard.vercel.app` e `https://admin.listapix.com`, mas esses commits estão só locais na branch `feat/communication-logs` do backend — não vão pra produção até essa branch ser deployada.
+- **Frontend e backend deployados podem ficar fora de sincronia.** O frontend na Vercel já espera `totalTransacoes`/`transacoesMesaCamarote`/`transacoesIngresso` em `ClientOverview`/`EventTotals` (tipos obrigatórios, não opcionais). O backend de produção (`api.oitickets.com.br`) ainda não tem esses campos até a branch `feat/communication-logs` subir — nesse meio-tempo a coluna "Transações" do dashboard em produção vai mostrar `undefined` em vez de um número. Não é uma regressão nova, é o mesmo padrão dos outros commits do backend só-local (correção de split, CORS) — todos esperando o mesmo deploy.
 
 ### Local
 
