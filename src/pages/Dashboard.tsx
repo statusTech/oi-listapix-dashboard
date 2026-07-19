@@ -3,14 +3,17 @@ import { api } from "../lib/api";
 import type { DashboardOverview, ClientOverview } from "../types/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
+import { useAuth } from "../context/AuthContext";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 export function Dashboard() {
+  const { logout } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -42,6 +45,13 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto max-w-5xl p-8">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Lista Pix — Dashboard</h1>
+        <Button onClick={logout} variant="outline">
+          Sair
+        </Button>
+      </div>
+
       <div className="mb-6 grid grid-cols-3 gap-4">
         <Card>
           <CardHeader>
