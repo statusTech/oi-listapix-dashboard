@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("token", response.data.token);
       return { error: null };
     } catch (err) {
+      console.error("[AuthContext] login failed:", err);
       return { error: "E-mail ou senha invalidos." };
     }
   }
