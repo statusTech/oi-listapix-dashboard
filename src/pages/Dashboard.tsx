@@ -8,6 +8,7 @@ import { Input } from "../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { useAuth } from "../context/AuthContext";
+import { ClientBarChart } from "../components/ClientBarChart";
 
 type SplitFilter = "all" | "split" | "notSplit";
 
@@ -56,7 +57,7 @@ export function Dashboard() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl p-8">
+    <div className="mx-auto max-w-6xl p-8">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-semibold">Lista Pix — Dashboard</h1>
         <Button onClick={logout} variant="outline">
@@ -97,81 +98,115 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          placeholder="Buscar cliente..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="sm:max-w-xs"
-        />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={splitFilter === "all" ? "default" : "outline"}
-            onClick={() => setSplitFilter("all")}
-          >
-            Todos
-          </Button>
-          <Button
-            type="button"
-            variant={splitFilter === "split" ? "default" : "outline"}
-            onClick={() => setSplitFilter("split")}
-          >
-            Splitados
-          </Button>
-          <Button
-            type="button"
-            variant={splitFilter === "notSplit" ? "default" : "outline"}
-            onClick={() => setSplitFilter("notSplit")}
-          >
-            Não splitados
-          </Button>
-        </div>
-      </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
+        <div>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Input
+              placeholder="Buscar cliente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="sm:max-w-xs"
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={splitFilter === "all" ? "default" : "outline"}
+                onClick={() => setSplitFilter("all")}
+              >
+                Todos
+              </Button>
+              <Button
+                type="button"
+                variant={splitFilter === "split" ? "default" : "outline"}
+                onClick={() => setSplitFilter("split")}
+              >
+                Splitados
+              </Button>
+              <Button
+                type="button"
+                variant={splitFilter === "notSplit" ? "default" : "outline"}
+                onClick={() => setSplitFilter("notSplit")}
+              >
+                Não splitados
+              </Button>
+            </div>
+          </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Eventos ativos</TableHead>
-            <TableHead>Total vendido</TableHead>
-            <TableHead>Total de taxas</TableHead>
-            <TableHead>Split</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredClients.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
-                Nenhum cliente encontrado.
-              </TableCell>
-            </TableRow>
-          )}
-          {filteredClients.map((client: ClientOverview) => (
-            <Fragment key={client.clientId}>
-              <TableRow className="cursor-pointer" onClick={() => toggleExpanded(client.clientId)}>
-                <TableCell>{client.name}</TableCell>
-                <TableCell>{client.events.length}</TableCell>
-                <TableCell>{formatCurrency(client.totalVendido)}</TableCell>
-                <TableCell>{formatCurrency(client.totalTaxas)}</TableCell>
-                <TableCell>
-                  <Badge variant={client.split ? "default" : "secondary"}>{client.split ? "Sim" : "Não"}</Badge>
-                </TableCell>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Eventos ativos</TableHead>
+                <TableHead>Total vendido</TableHead>
+                <TableHead>Total de taxas</TableHead>
+                <TableHead>Split</TableHead>
               </TableRow>
-              {expanded.has(client.clientId) &&
-                client.events.map((event) => (
-                  <TableRow key={event.eventId} className="bg-neutral-50">
-                    <TableCell className="pl-8 text-sm text-neutral-600">{event.name}</TableCell>
-                    <TableCell />
-                    <TableCell className="text-sm">{formatCurrency(event.totalVendido)}</TableCell>
-                    <TableCell className="text-sm">{formatCurrency(event.totalTaxas)}</TableCell>
-                    <TableCell />
+            </TableHeader>
+            <TableBody>
+              {filteredClients.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
+                    Nenhum cliente encontrado.
+                  </TableCell>
+                </TableRow>
+              )}
+              {filteredClients.map((client: ClientOverview) => (
+                <Fragment key={client.clientId}>
+                  <TableRow className="cursor-pointer" onClick={() => toggleExpanded(client.clientId)}>
+                    <TableCell>{client.name}</TableCell>
+                    <TableCell>{client.events.length}</TableCell>
+                    <TableCell>{formatCurrency(client.totalVendido)}</TableCell>
+                    <TableCell>{formatCurrency(client.totalTaxas)}</TableCell>
+                    <TableCell>
+                      <Badge variant={client.split ? "default" : "secondary"}>{client.split ? "Sim" : "Não"}</Badge>
+                    </TableCell>
                   </TableRow>
-                ))}
-            </Fragment>
-          ))}
-        </TableBody>
-      </Table>
+                  {expanded.has(client.clientId) &&
+                    client.events.map((event) => (
+                      <TableRow key={event.eventId} className="bg-neutral-50">
+                        <TableCell className="pl-8 text-sm text-neutral-600">{event.name}</TableCell>
+                        <TableCell />
+                        <TableCell className="text-sm">{formatCurrency(event.totalVendido)}</TableCell>
+                        <TableCell className="text-sm">{formatCurrency(event.totalTaxas)}</TableCell>
+                        <TableCell />
+                      </TableRow>
+                    ))}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+
+        <Card className="lg:sticky lg:top-8">
+          <CardHeader>
+            <CardTitle className="text-sm text-neutral-500">Clientes filtrados ({filteredClients.length})</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center gap-4 text-xs text-neutral-600">
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                Splitado
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-neutral-400" />
+                Não splitado
+              </span>
+            </div>
+            <ClientBarChart
+              title="Total vendido"
+              clients={filteredClients}
+              metric="totalVendido"
+              formatValue={formatCurrency}
+            />
+            <ClientBarChart
+              title="Total de taxas"
+              clients={filteredClients}
+              metric="totalTaxas"
+              formatValue={formatCurrency}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
