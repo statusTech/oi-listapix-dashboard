@@ -4,9 +4,12 @@ import type { DashboardOverview, ClientOverview } from "../types/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
 import { useAuth } from "../context/AuthContext";
+
+type SplitFilter = "all" | "split" | "notSplit";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -17,6 +20,8 @@ export function Dashboard() {
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const [splitFilter, setSplitFilter] = useState<SplitFilter>("all");
 
   useEffect(() => {
     api
@@ -42,6 +47,13 @@ export function Dashboard() {
       </div>
     );
   }
+
+  const filteredClients = data.clients.filter((client) => {
+    const matchesSearch = client.name.toLowerCase().includes(search.trim().toLowerCase());
+    const matchesSplit =
+      splitFilter === "all" || (splitFilter === "split" ? client.split : !client.split);
+    return matchesSearch && matchesSplit;
+  });
 
   return (
     <div className="mx-auto max-w-5xl p-8">
@@ -85,6 +97,38 @@ export function Dashboard() {
         </Card>
       </div>
 
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Input
+          placeholder="Buscar cliente..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="sm:max-w-xs"
+        />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={splitFilter === "all" ? "default" : "outline"}
+            onClick={() => setSplitFilter("all")}
+          >
+            Todos
+          </Button>
+          <Button
+            type="button"
+            variant={splitFilter === "split" ? "default" : "outline"}
+            onClick={() => setSplitFilter("split")}
+          >
+            Splitados
+          </Button>
+          <Button
+            type="button"
+            variant={splitFilter === "notSplit" ? "default" : "outline"}
+            onClick={() => setSplitFilter("notSplit")}
+          >
+            Não splitados
+          </Button>
+        </div>
+      </div>
+
       <Table>
         <TableHeader>
           <TableRow>
@@ -96,7 +140,14 @@ export function Dashboard() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.clients.map((client: ClientOverview) => (
+          {filteredClients.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-sm text-neutral-500">
+                Nenhum cliente encontrado.
+              </TableCell>
+            </TableRow>
+          )}
+          {filteredClients.map((client: ClientOverview) => (
             <Fragment key={client.clientId}>
               <TableRow className="cursor-pointer" onClick={() => toggleExpanded(client.clientId)}>
                 <TableCell>{client.name}</TableCell>
