@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-19T00:00:00Z",
+  "title": "Design System: Lista Pix Dashboard",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Azul Oi",
+        "canonical": "oklch(0.665 0.186 249.503)",
+        "tonalRamp": [
+          "oklch(0.20 0.09 249.5)",
+          "oklch(0.30 0.12 249.5)",
+          "oklch(0.40 0.15 249.5)",
+          "oklch(0.50 0.17 249.5)",
+          "oklch(0.60 0.185 249.5)",
+          "oklch(0.665 0.186 249.5)",
+          "oklch(0.80 0.10 249.5)",
+          "oklch(0.92 0.03 249.5)"
+        ]
+      },
+      "background": { "role": "neutral", "displayName": "Branco", "canonical": "oklch(1 0 0)" },
+      "foreground": { "role": "neutral", "displayName": "Cinza Quase-Preto", "canonical": "oklch(0.145 0 0)" },
+      "muted-foreground": { "role": "neutral", "displayName": "Cinza Médio", "canonical": "oklch(0.556 0 0)" },
+      "border": { "role": "neutral", "displayName": "Cinza Borda", "canonical": "oklch(0.922 0 0)" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Título de página." },
+      "title": { "displayName": "Title", "purpose": "CardTitle quando é número grande." },
+      "body": { "displayName": "Body", "purpose": "Texto de tabela e UI padrão." },
+      "label": { "displayName": "Label", "purpose": "Rótulo pequeno de card/legenda." }
+    },
+    "shadows": [
+      { "name": "card", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Único uso de sombra no sistema; aplicado ao Card." }
+    ],
+    "motion": [],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botão de filtro ativo / ação principal.",
+      "html": "<button class=\"ds-btn-primary\">Splitados</button>",
+      "css": ".ds-btn-primary { background: oklch(0.665 0.186 249.503); color: oklch(0.985 0 0); padding: 8px 16px; border-radius: 6px; font-size: 0.875rem; font-weight: 500; border: none; transition: background-color 0.15s; } .ds-btn-primary:hover { background: oklch(0.665 0.186 249.503 / 0.9); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(1 0 0), 0 0 0 4px oklch(0.708 0 0); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Botão de filtro inativo / ação secundária (ex: Sair).",
+      "html": "<button class=\"ds-btn-outline\">Sair</button>",
+      "css": ".ds-btn-outline { background: oklch(1 0 0); color: oklch(0.145 0 0); padding: 8px 16px; border-radius: 6px; border: 1px solid oklch(0.922 0 0); font-size: 0.875rem; font-weight: 500; transition: background-color 0.15s; } .ds-btn-outline:hover { background: oklch(0.97 0 0); }"
+    },
+    {
+      "name": "Badge Splitado",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "Indica cliente com split ativo. Sempre acompanhado do texto Sim/Não.",
+      "html": "<span class=\"ds-badge-default\">Sim</span>",
+      "css": ".ds-badge-default { display: inline-flex; align-items: center; background: oklch(0.665 0.186 249.503); color: oklch(0.985 0 0); padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }"
+    },
+    {
+      "name": "Badge Não Splitado",
+      "kind": "chip",
+      "refersTo": "badge-secondary",
+      "description": "Indica cliente sem split configurado.",
+      "html": "<span class=\"ds-badge-secondary\">Não</span>",
+      "css": ".ds-badge-secondary { display: inline-flex; align-items: center; background: oklch(0.97 0 0); color: oklch(0.205 0 0); padding: 2px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Container de métrica de resumo ou do painel lateral de gráficos.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Total vendido</div><div class=\"ds-card-value\">R$ 12.340,00</div></div>",
+      "css": ".ds-card { background: oklch(1 0 0); border: 1px solid oklch(0.922 0 0); border-radius: 8px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); padding: 24px; } .ds-card-title { font-size: 0.875rem; color: oklch(0.556 0 0); margin-bottom: 4px; } .ds-card-value { font-size: 1.5rem; font-weight: 600; color: oklch(0.145 0 0); }"
+    },
+    {
+      "name": "Input Busca",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo de busca por nome de cliente.",
+      "html": "<input class=\"ds-input\" placeholder=\"Buscar cliente...\" />",
+      "css": ".ds-input { height: 40px; width: 100%; border: 1px solid oklch(0.922 0 0); border-radius: 6px; background: oklch(1 0 0); padding: 8px 12px; font-size: 0.875rem; color: oklch(0.145 0 0); } .ds-input::placeholder { color: oklch(0.556 0 0); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(1 0 0), 0 0 0 4px oklch(0.708 0 0); }"
+    },
+    {
+      "name": "Table Row",
+      "kind": "custom",
+      "refersTo": "table-row",
+      "description": "Linha de cliente, clicável pra expandir eventos.",
+      "html": "<tr class=\"ds-table-row\"><td class=\"ds-table-cell\">Sociedade Vera Cruz</td><td class=\"ds-table-cell\">3</td></tr>",
+      "css": ".ds-table-row { border-bottom: 1px solid oklch(0.922 0 0); cursor: pointer; transition: background-color 0.15s; } .ds-table-row:hover { background: oklch(0.97 0 0 / 0.5); } .ds-table-cell { padding: 16px; font-size: 0.875rem; color: oklch(0.145 0 0); }"
+    },
+    {
+      "name": "Bar Chart Track",
+      "kind": "custom",
+      "refersTo": "client-bar-chart",
+      "description": "Barra de métrica por cliente; cor codifica status de split (mesma regra do Badge).",
+      "html": "<div class=\"ds-bar-track\"><div class=\"ds-bar-fill\" style=\"width: 62%\">R$ 8.200</div></div>",
+      "css": ".ds-bar-track { position: relative; height: 20px; border-radius: 2px; background: oklch(0.97 0 0); overflow: hidden; } .ds-bar-fill { display: flex; align-items: center; justify-content: flex-end; height: 20px; padding-right: 8px; border-radius: 0 2px 2px 0; background: oklch(0.665 0.186 249.503); color: oklch(0.985 0 0); font-size: 0.6875rem; font-weight: 500; white-space: nowrap; transition: filter 0.15s; } .ds-bar-fill:hover { filter: brightness(0.9); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "O Balancete",
+    "overview": "Ferramenta de auditoria interna, não produto voltado a impressionar. Duas pessoas (super-admin) abrem, escaneiam números, saem. A superfície inteira é neutro cinza claro sobre branco — nenhuma cor compete com o dado. Existe exatamente um acento: o azul da Oi Tickets, usado só onde marca um estado que importa checar (split ativo, filtro selecionado). Fora disso, tudo é texto e tabela. Rejeita explicitamente qualquer estética de dashboard de SaaS de vendas: nada de hero-metric com gradiente, nada de cards de ícone repetidos, nada de cor decorativa.",
+    "keyCharacteristics": [
+      "Cinza neutro (chroma 0) domina; azul Oi aparece em <10% da superfície",
+      "Densidade de informação (tabela expansível, linhas por evento) acima de respiro visual",
+      "Quase flat: única sombra do sistema é shadow-sm no Card",
+      "Status nunca depende só de cor (texto Sim/Não acompanha o Badge)"
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Azul Oi só existe pra dizer \"isso está splitado\" ou \"isso está selecionado\". Elemento novo que quer azul só pra chamar atenção sem esse significado: usar peso ou tamanho de fonte em vez de cor.", "section": "colors" },
+      { "name": "The No-Emphasis-By-Font Rule", "body": "Hierarquia vem de tamanho e peso, nunca de itálico ou fonte alternativa.", "section": "typography" },
+      { "name": "The Flat-Except-Card Rule", "body": "Se um componente novo \"precisa\" de sombra pra se destacar, a resposta certa quase sempre é virar um Card — não inventar novo nível de elevação.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do manter o Azul Oi restrito a estado \"splitado\" ou \"selecionado\" — nunca decorativo.",
+      "Do acompanhar todo indicador de cor de texto ou posição que carregue o mesmo significado.",
+      "Do usar Card + shadow-sm quando um elemento precisar se destacar do fundo.",
+      "Do manter densidade de tabela (linha expansível) como padrão de novas visualizações."
+    ],
+    "donts": [
+      "Don't usar gradiente, glassmorphism ou hero-metric com cor de destaque.",
+      "Don't introduzir uma segunda cor de acento.",
+      "Don't adicionar fonte customizada.",
+      "Don't usar border-left/border-right colorido como indicador de status."
+    ]
+  }
+}
