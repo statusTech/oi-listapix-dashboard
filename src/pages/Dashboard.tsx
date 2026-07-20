@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Skeleton } from "../components/ui/skeleton";
 import { useAuth } from "../context/AuthContext";
 import { BarChart, type BarChartEntry } from "../components/BarChart";
+import { ColumnChart, type ColumnChartEntry } from "../components/ColumnChart";
 
 type SplitFilter = "all" | "split" | "notSplit";
 
@@ -19,6 +20,10 @@ function formatCurrency(value: number) {
 
 function formatCount(value: number) {
   return value.toLocaleString("pt-BR");
+}
+
+function formatPercent(value: number) {
+  return `${value.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 function TransacoesCell({
@@ -86,13 +91,20 @@ export function Dashboard() {
     })
     .sort((a, b) => b.totalVendido - a.totalVendido);
 
-  const clientEntries = (metric: "totalVendido" | "totalTaxas" | "totalTransacoes"): BarChartEntry[] =>
+  const clientEntries = (metric: "totalVendido" | "totalTaxas" | "totalTransacoes"): ColumnChartEntry[] =>
     filteredClients.map((client) => ({
       id: client.clientId,
       label: client.name,
       value: client[metric],
       highlighted: client.split,
     }));
+
+  const taxaEfetivaEntries: ColumnChartEntry[] = filteredClients.map((client) => ({
+    id: client.clientId,
+    label: client.name,
+    value: client.totalVendido > 0 ? (client.totalTaxas / client.totalVendido) * 100 : 0,
+    highlighted: client.split,
+  }));
 
   const eventEntries: BarChartEntry[] = filteredClients.flatMap((client) =>
     client.events.map((event) => ({
@@ -265,15 +277,21 @@ export function Dashboard() {
             </span>
           </div>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
-          <BarChart title="Total vendido" entries={clientEntries("totalVendido")} formatValue={formatCurrency} />
-          <BarChart
-            title="Total de taxas"
-            entries={clientEntries("totalTaxas")}
-            formatValue={formatCurrency}
-            note="Ordenado por total de taxas — pode diferir da ordem da tabela"
-          />
-          <BarChart title="Transações por cliente" entries={clientEntries("totalTransacoes")} formatValue={formatCount} />
+        <CardContent className="space-y-8">
+          <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-3">
+            <ColumnChart title="Total vendido" entries={clientEntries("totalVendido")} formatValue={formatCurrency} />
+            <ColumnChart
+              title="Taxa efetiva"
+              entries={taxaEfetivaEntries}
+              formatValue={formatPercent}
+              note="Total de taxas ÷ total vendido — expõe % fora do padrão do cliente"
+            />
+            <ColumnChart
+              title="Transações por cliente"
+              entries={clientEntries("totalTransacoes")}
+              formatValue={formatCount}
+            />
+          </div>
           <BarChart
             title="Total vendido por evento"
             entries={eventEntries}

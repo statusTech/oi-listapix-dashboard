@@ -40,7 +40,7 @@ export function BarChart({ title, entries, formatValue, note }: BarChartProps) {
             return (
               <div key={entry.id} className="group relative flex items-center gap-2">
                 <span
-                  className="max-w-[45%] shrink-0 truncate text-xs text-neutral-600 sm:max-w-[11rem] lg:max-w-[14rem]"
+                  className="max-w-[45%] shrink-0 truncate text-xs text-neutral-600 sm:max-w-[16rem] lg:max-w-[22rem]"
                   title={entry.label}
                 >
                   {entry.label}
