@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
-import { ChevronRight, Trash2 } from "lucide-react";
+import { CalendarCheck, ChevronRight, Search, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import type { DashboardOverview, ClientOverview } from "../types/dashboard";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -11,8 +11,15 @@ import { Skeleton } from "../components/ui/skeleton";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BarChart, type BarChartEntry } from "../components/BarChart";
 import { ColumnChart, type ColumnChartEntry } from "../components/ColumnChart";
+import { cn } from "../lib/utils";
 
 type SplitFilter = "all" | "split" | "notSplit";
+
+const SPLIT_FILTER_OPTIONS: { value: SplitFilter; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "split", label: "Splitados" },
+  { value: "notSplit", label: "Não splitados" },
+];
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -87,8 +94,23 @@ export function Dashboard() {
         clientId: excludeTarget.clientId,
         name: excludeTarget.name,
       });
+      const excluded = excludeTarget;
       setExcludeTarget(null);
-      await loadOverview();
+      setData((prev) => {
+        if (!prev) return prev;
+        const clients = prev.clients.filter((c) => c.clientId !== excluded.clientId);
+        return {
+          ...prev,
+          clients,
+          summary: {
+            totalClientesAtivos: prev.summary.totalClientesAtivos - 1,
+            totalSplitados: prev.summary.totalSplitados - (excluded.split ? 1 : 0),
+            totalNaoSplitados: prev.summary.totalNaoSplitados - (excluded.split ? 0 : 1),
+            totalVendidoGeral: prev.summary.totalVendidoGeral - excluded.totalVendido,
+            totalTaxasGeral: prev.summary.totalTaxasGeral - excluded.totalTaxas,
+          },
+        };
+      });
     } catch {
       setError("Não foi possível excluir o cliente.");
     } finally {
@@ -104,6 +126,8 @@ export function Dashboard() {
       </div>
     );
   }
+
+  const hasActiveFilters = search.trim() !== "" || splitFilter !== "all" || onlyActiveEvents;
 
   const filteredClients = data.clients
     .filter((client) => {
@@ -165,44 +189,71 @@ export function Dashboard() {
         </span>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          placeholder="Buscar cliente..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="sm:max-w-xs"
-        />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={splitFilter === "all" ? "default" : "outline"}
-            onClick={() => setSplitFilter("all")}
-          >
-            Todos
-          </Button>
-          <Button
-            type="button"
-            variant={splitFilter === "split" ? "default" : "outline"}
-            onClick={() => setSplitFilter("split")}
-          >
-            Splitados
-          </Button>
-          <Button
-            type="button"
-            variant={splitFilter === "notSplit" ? "default" : "outline"}
-            onClick={() => setSplitFilter("notSplit")}
-          >
-            Não splitados
-          </Button>
+      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-neutral-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative sm:max-w-xs sm:flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+          <Input
+            placeholder="Buscar cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex overflow-hidden rounded-md border border-input" role="group" aria-label="Filtrar por status de split">
+            {SPLIT_FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={splitFilter === option.value}
+                onClick={() => setSplitFilter(option.value)}
+                className={cn(
+                  "h-9 whitespace-nowrap px-3 text-sm font-medium transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-input",
+                  splitFilter === option.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
           <Button
             type="button"
             variant={onlyActiveEvents ? "default" : "outline"}
+            size="sm"
+            className="h-9"
+            aria-pressed={onlyActiveEvents}
             onClick={() => setOnlyActiveEvents((prev) => !prev)}
           >
+            <CalendarCheck className="h-4 w-4" aria-hidden="true" />
             Com eventos ativos
           </Button>
+
+          {hasActiveFilters && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 text-neutral-500 hover:text-foreground"
+              onClick={() => {
+                setSearch("");
+                setSplitFilter("all");
+                setOnlyActiveEvents(false);
+              }}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Limpar filtros
+            </Button>
+          )}
         </div>
       </div>
+
+      <p className="mb-2 text-sm text-neutral-500">
+        {filteredClients.length} de {data.clients.length} {data.clients.length === 1 ? "cliente" : "clientes"}
+      </p>
 
       <Table>
         <TableHeader>
@@ -309,45 +360,58 @@ export function Dashboard() {
         </TableBody>
       </Table>
 
-      <Card className="mt-6">
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-sm text-neutral-500">
-            Gráficos — {filteredClients.length} {filteredClients.length === 1 ? "cliente filtrado" : "clientes filtrados"}
-          </CardTitle>
-          <div className="flex items-center gap-4 text-xs text-neutral-600">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-              Splitado
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-neutral-400" />
-              Não splitado
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-8">
-          <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-3">
+      <div className="mt-6 flex items-center justify-between">
+        <h2 className="text-sm text-neutral-500">
+          Gráficos — {filteredClients.length} {filteredClients.length === 1 ? "cliente filtrado" : "clientes filtrados"}
+        </h2>
+        <div className="flex items-center gap-4 text-xs text-neutral-600">
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+            Splitado
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full bg-neutral-400" />
+            Não splitado
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <Card>
+          <CardContent className="pt-6">
             <ColumnChart title="Total vendido" entries={clientEntries("totalVendido")} formatValue={formatCurrency} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
             <ColumnChart
               title="Taxa efetiva"
               entries={taxaEfetivaEntries}
               formatValue={formatPercent}
               note="Total de taxas ÷ total vendido — expõe % fora do padrão do cliente"
             />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
             <ColumnChart
               title="Transações por cliente"
               entries={clientEntries("totalTransacoes")}
               formatValue={formatCount}
             />
-          </div>
-          <BarChart
-            title="Total vendido por evento"
-            entries={eventEntries}
-            formatValue={formatCurrency}
-            note="Cada barra é um evento, agrupado por cliente — ingresso e mesa/camarote somados"
-          />
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <BarChart
+              title="Total vendido por evento"
+              entries={eventEntries}
+              formatValue={formatCurrency}
+              note="Cada barra é um evento, agrupado por cliente — ingresso e mesa/camarote somados"
+            />
+          </CardContent>
+        </Card>
+      </div>
 
       <ConfirmDialog
         open={excludeTarget !== null}
