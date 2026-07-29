@@ -33,3 +33,14 @@ export interface DashboardOverview {
   };
   clients: ClientOverview[];
 }
+
+export interface BlacklistEntry {
+  clientId: string;
+  name: string;
+  reason: string;
+}
+
+export interface BlacklistResponse {
+  success: boolean;
+  entries: BlacklistEntry[];
+}

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import type { DashboardOverview, ClientOverview } from "../types/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -8,7 +8,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Skeleton } from "../components/ui/skeleton";
-import { useAuth } from "../context/AuthContext";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { BarChart, type BarChartEntry } from "../components/BarChart";
 import { ColumnChart, type ColumnChartEntry } from "../components/ColumnChart";
 
@@ -50,18 +50,23 @@ function TransacoesCell({
 }
 
 export function Dashboard() {
-  const { logout } = useAuth();
   const [data, setData] = useState<DashboardOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [splitFilter, setSplitFilter] = useState<SplitFilter>("all");
+  const [excludeTarget, setExcludeTarget] = useState<ClientOverview | null>(null);
+  const [excluding, setExcluding] = useState(false);
 
-  useEffect(() => {
-    api
+  function loadOverview() {
+    return api
       .get<DashboardOverview>("/admin/listapix-dashboard/overview")
       .then((response) => setData(response.data))
       .catch(() => setError("Não foi possível carregar o dashboard."));
+  }
+
+  useEffect(() => {
+    loadOverview();
   }, []);
 
   function toggleExpanded(clientId: string) {
@@ -71,6 +76,23 @@ export function Dashboard() {
       else next.add(clientId);
       return next;
     });
+  }
+
+  async function handleConfirmExcluir() {
+    if (!excludeTarget) return;
+    setExcluding(true);
+    try {
+      await api.post("/admin/listapix-dashboard/blacklist", {
+        clientId: excludeTarget.clientId,
+        name: excludeTarget.name,
+      });
+      setExcludeTarget(null);
+      await loadOverview();
+    } catch {
+      setError("Não foi possível excluir o cliente.");
+    } finally {
+      setExcluding(false);
+    }
   }
 
   if (error) return <p className="p-8 text-red-600">{error}</p>;
@@ -117,13 +139,6 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl p-8">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Lista Pix — Dashboard</h1>
-        <Button onClick={logout} variant="outline">
-          Sair
-        </Button>
-      </div>
-
       <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-border pb-4">
         <span>
           <span className="text-sm text-neutral-500">Total vendido</span>{" "}
@@ -188,12 +203,13 @@ export function Dashboard() {
             <TableHead>Total vendido</TableHead>
             <TableHead>Total de taxas</TableHead>
             <TableHead>Split</TableHead>
+            <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredClients.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-sm text-neutral-500">
+              <TableCell colSpan={7} className="text-center text-sm text-neutral-500">
                 Nenhum cliente encontrado.
               </TableCell>
             </TableRow>
@@ -237,6 +253,20 @@ export function Dashboard() {
                 <TableCell>
                   <Badge variant={client.split ? "default" : "secondary"}>{client.split ? "Sim" : "Não"}</Badge>
                 </TableCell>
+                <TableCell>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExcludeTarget(client);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir
+                  </Button>
+                </TableCell>
               </TableRow>
               {expanded.has(client.clientId) &&
                 client.events.map((event) => (
@@ -253,6 +283,7 @@ export function Dashboard() {
                     </TableCell>
                     <TableCell className="text-sm">{formatCurrency(event.totalVendido)}</TableCell>
                     <TableCell className="text-sm">{formatCurrency(event.totalTaxas)}</TableCell>
+                    <TableCell />
                     <TableCell />
                   </TableRow>
                 ))}
@@ -300,6 +331,20 @@ export function Dashboard() {
           />
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={excludeTarget !== null}
+        title="Excluir cliente"
+        description={
+          excludeTarget
+            ? `"${excludeTarget.name}" vai pra Lista Negra e some deste dashboard. Você pode restaurar depois em Lista Negra.`
+            : ""
+        }
+        confirmLabel="Excluir"
+        confirming={excluding}
+        onConfirm={handleConfirmExcluir}
+        onCancel={() => setExcludeTarget(null)}
+      />
     </div>
   );
 }
