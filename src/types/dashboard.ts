@@ -1,6 +1,7 @@
 export interface EventTotals {
   eventId: string;
   name: string;
+  ativo: boolean;
   totalVendido: number;
   totalTaxas: number;
   totalItens: number;

@@ -55,6 +55,7 @@ export function Dashboard() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [splitFilter, setSplitFilter] = useState<SplitFilter>("all");
+  const [onlyActiveEvents, setOnlyActiveEvents] = useState(false);
   const [excludeTarget, setExcludeTarget] = useState<ClientOverview | null>(null);
   const [excluding, setExcluding] = useState(false);
 
@@ -109,7 +110,9 @@ export function Dashboard() {
       const matchesSearch = client.name.toLowerCase().includes(search.trim().toLowerCase());
       const matchesSplit =
         splitFilter === "all" || (splitFilter === "split" ? client.split : !client.split);
-      return matchesSearch && matchesSplit;
+      const eventosAtivos = client.events.filter((event) => event.ativo).length;
+      const matchesActiveEvents = !onlyActiveEvents || eventosAtivos > 0;
+      return matchesSearch && matchesSplit && matchesActiveEvents;
     })
     .sort((a, b) => b.totalVendido - a.totalVendido);
 
@@ -191,6 +194,13 @@ export function Dashboard() {
           >
             Não splitados
           </Button>
+          <Button
+            type="button"
+            variant={onlyActiveEvents ? "default" : "outline"}
+            onClick={() => setOnlyActiveEvents((prev) => !prev)}
+          >
+            Com eventos ativos
+          </Button>
         </div>
       </div>
 
@@ -198,6 +208,7 @@ export function Dashboard() {
         <TableHeader>
           <TableRow>
             <TableHead>Cliente</TableHead>
+            <TableHead>Total de eventos</TableHead>
             <TableHead>Eventos ativos</TableHead>
             <TableHead>Transações</TableHead>
             <TableHead>Total vendido</TableHead>
@@ -209,7 +220,7 @@ export function Dashboard() {
         <TableBody>
           {filteredClients.length === 0 && (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-sm text-neutral-500">
+              <TableCell colSpan={8} className="text-center text-sm text-neutral-500">
                 Nenhum cliente encontrado.
               </TableCell>
             </TableRow>
@@ -241,6 +252,7 @@ export function Dashboard() {
                   </span>
                 </TableCell>
                 <TableCell>{client.events.length}</TableCell>
+                <TableCell>{client.events.filter((event) => event.ativo).length}</TableCell>
                 <TableCell>
                   <TransacoesCell
                     total={client.totalTransacoes}
@@ -273,6 +285,11 @@ export function Dashboard() {
                   <TableRow key={event.eventId} className="bg-neutral-50 hover:bg-neutral-50">
                     <TableCell className="pl-8 text-sm text-neutral-600">{event.name}</TableCell>
                     <TableCell />
+                    <TableCell>
+                      <Badge variant={event.ativo ? "default" : "secondary"} className="text-xs">
+                        {event.ativo ? "Ativo" : "Encerrado"}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <TransacoesCell
                         total={event.totalTransacoes}

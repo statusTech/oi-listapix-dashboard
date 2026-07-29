@@ -6,17 +6,6 @@ import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
-// reason sempre termina em "... em <ISO timestamp>" (gerado pelo backend, ver blacklist.js)
-const REASON_TIMESTAMP_RE = /em (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)$/;
-
-function formatReasonDate(reason: string) {
-  const match = reason.match(REASON_TIMESTAMP_RE);
-  if (!match) return reason;
-  const date = new Date(match[1]);
-  if (Number.isNaN(date.getTime())) return reason;
-  return date.toLocaleString("pt-BR");
-}
-
 export function ListaNegra() {
   const [entries, setEntries] = useState<BlacklistEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,14 +54,13 @@ export function ListaNegra() {
         <TableHeader>
           <TableRow>
             <TableHead>Cliente</TableHead>
-            <TableHead>Data</TableHead>
             <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {entries.length === 0 && (
             <TableRow>
-              <TableCell colSpan={3} className="text-center text-sm text-neutral-500">
+              <TableCell colSpan={2} className="text-center text-sm text-neutral-500">
                 Nenhum cliente na lista negra.
               </TableCell>
             </TableRow>
@@ -80,7 +68,6 @@ export function ListaNegra() {
           {entries.map((entry) => (
             <TableRow key={entry.clientId}>
               <TableCell>{entry.name}</TableCell>
-              <TableCell className="text-sm text-neutral-600">{formatReasonDate(entry.reason)}</TableCell>
               <TableCell>
                 <Button type="button" variant="outline" size="sm" onClick={() => setRestoreTarget(entry)}>
                   Restaurar
