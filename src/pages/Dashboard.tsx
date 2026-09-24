@@ -521,7 +521,7 @@ export function Dashboard() {
             <SortableHead label="Cliente" sortKey="name" sort={sort} onSort={handleSort} />
             <SortableHead label="Total de eventos" sortKey="totalEventos" sort={sort} onSort={handleSort} />
             <SortableHead label="Eventos ativos" sortKey="eventosAtivos" sort={sort} onSort={handleSort} />
-            <SortableHead label="Transações" sortKey="totalTransacoes" sort={sort} onSort={handleSort} />
+            <SortableHead label="Ingressos" sortKey="totalTransacoes" sort={sort} onSort={handleSort} />
             <SortableHead label="Total vendido" sortKey="totalVendido" sort={sort} onSort={handleSort} />
             <SortableHead label="Total de taxas" sortKey="totalTaxas" sort={sort} onSort={handleSort} />
             <SortableHead label="Split" sortKey="split" sort={sort} onSort={handleSort} />
@@ -662,7 +662,7 @@ export function Dashboard() {
         <Card>
           <CardContent className="pt-6">
             <ColumnChart
-              title="Transações por cliente"
+              title="Ingressos por cliente"
               entries={clientEntries("totalTransacoes")}
               formatValue={formatCount}
             />
