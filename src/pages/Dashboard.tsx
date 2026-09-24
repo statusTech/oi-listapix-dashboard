@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from "react";
+import axios from "axios";
 import { CalendarCheck, ChevronRight, Search, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import type { DashboardOverview, ClientOverview } from "../types/dashboard";
@@ -20,6 +21,39 @@ const SPLIT_FILTER_OPTIONS: { value: SplitFilter; label: string }[] = [
   { value: "split", label: "Splitados" },
   { value: "notSplit", label: "Não splitados" },
 ];
+
+type DateFilter = "today" | "month" | "custom";
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: "today", label: "Hoje" },
+  { value: "month", label: "Este mês" },
+  { value: "custom", label: "Personalizado" },
+];
+
+// YYYY-MM-DD no fuso local (toISOString converteria pra UTC e pode virar o dia).
+function toDateParam(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+// Intervalo inclusivo [startDate, endDate]; null quando o personalizado ainda está incompleto/inválido.
+function resolveDateRange(filter: DateFilter, customStart: string, customEnd: string) {
+  const now = new Date();
+  if (filter === "today") {
+    const today = toDateParam(now);
+    return { startDate: today, endDate: today };
+  }
+  if (filter === "month") {
+    return {
+      startDate: toDateParam(new Date(now.getFullYear(), now.getMonth(), 1)),
+      endDate: toDateParam(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+  }
+  if (!customStart || !customEnd || customStart > customEnd) return null;
+  return { startDate: customStart, endDate: customEnd };
+}
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -63,19 +97,46 @@ export function Dashboard() {
   const [search, setSearch] = useState("");
   const [splitFilter, setSplitFilter] = useState<SplitFilter>("all");
   const [onlyActiveEvents, setOnlyActiveEvents] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>("month");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [loading, setLoading] = useState(false);
   const [excludeTarget, setExcludeTarget] = useState<ClientOverview | null>(null);
   const [excluding, setExcluding] = useState(false);
 
-  function loadOverview() {
-    return api
-      .get<DashboardOverview>("/admin/listapix-dashboard/overview")
-      .then((response) => setData(response.data))
-      .catch(() => setError("Não foi possível carregar o dashboard."));
-  }
+  const dateRange = resolveDateRange(dateFilter, customStart, customEnd);
+  const startDate = dateRange?.startDate;
+  const endDate = dateRange?.endDate;
 
   useEffect(() => {
-    loadOverview();
-  }, []);
+    if (!startDate || !endDate) return;
+    const controller = new AbortController();
+    setLoading(true);
+    api
+      .get<DashboardOverview>("/admin/listapix-dashboard/overview", {
+        params: { startDate, endDate },
+        signal: controller.signal,
+      })
+      .then((response) => setData(response.data))
+      .catch((err) => {
+        if (!axios.isCancel(err)) setError("Não foi possível carregar o dashboard.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [startDate, endDate]);
+
+  function selectDateFilter(value: DateFilter) {
+    if (value === "custom" && !customStart && !customEnd) {
+      const current = resolveDateRange(dateFilter, "", "");
+      if (current) {
+        setCustomStart(current.startDate);
+        setCustomEnd(current.endDate);
+      }
+    }
+    setDateFilter(value);
+  }
 
   function toggleExpanded(clientId: string) {
     setExpanded((prev) => {
@@ -127,7 +188,9 @@ export function Dashboard() {
     );
   }
 
-  const hasActiveFilters = search.trim() !== "" || splitFilter !== "all" || onlyActiveEvents;
+  const hasActiveFilters =
+    search.trim() !== "" || splitFilter !== "all" || onlyActiveEvents || dateFilter !== "month";
+  const invalidCustomRange = dateFilter === "custom" && customStart !== "" && customEnd !== "" && customStart > customEnd;
 
   const filteredClients = data.clients
     .filter((client) => {
@@ -166,6 +229,52 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl p-8">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="inline-flex overflow-hidden rounded-md border border-input" role="group" aria-label="Filtrar por período">
+          {DATE_FILTER_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={dateFilter === option.value}
+              onClick={() => selectDateFilter(option.value)}
+              className={cn(
+                "h-9 whitespace-nowrap px-3 text-sm font-medium transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-input",
+                dateFilter === option.value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              aria-label="Data inicial"
+              value={customStart}
+              max={customEnd || undefined}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="h-9 w-auto"
+            />
+            <span className="text-sm text-neutral-500">até</span>
+            <Input
+              type="date"
+              aria-label="Data final"
+              value={customEnd}
+              min={customStart || undefined}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="h-9 w-auto"
+            />
+          </div>
+        )}
+
+        {invalidCustomRange && <span className="text-sm text-red-600">Data inicial depois da final.</span>}
+        {loading && <span className="text-sm text-neutral-500">Carregando...</span>}
+      </div>
+
       <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-border pb-4">
         <span>
           <span className="text-sm text-neutral-500">Total vendido</span>{" "}
@@ -242,6 +351,7 @@ export function Dashboard() {
                 setSearch("");
                 setSplitFilter("all");
                 setOnlyActiveEvents(false);
+                setDateFilter("month");
               }}
             >
               <X className="h-4 w-4" aria-hidden="true" />
