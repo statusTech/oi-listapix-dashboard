@@ -61,6 +61,20 @@ function eventDayKey(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? null : toDayKey(date);
 }
 
+function formatDayKey(dayKey: string) {
+  const [y, m, d] = dayKey.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function compareEventsByStartDesc(a: EventTotals, b: EventTotals) {
+  const sa = eventDayKey(a.date_ini);
+  const sb = eventDayKey(b.date_ini);
+  if (sa === sb) return 0;
+  if (!sa) return 1;
+  if (!sb) return -1;
+  return sa < sb ? 1 : -1;
+}
+
 function resolveDateRange(filter: DateFilter, customStart: string, customEnd: string) {
   const now = new Date();
   if (filter === "today") {
@@ -92,7 +106,7 @@ function eventOverlapsRange(event: EventTotals, range: { start: string; end: str
 type DisplayClient = ClientOverview & { allEvents: EventTotals[] };
 
 function withFilteredEvents(client: ClientOverview, keep: (event: EventTotals) => boolean): DisplayClient {
-  const events = client.events.filter(keep);
+  const events = client.events.filter(keep).sort(compareEventsByStartDesc);
   const sum = (key: "totalVendido" | "totalTaxas" | "totalItens" | "totalTransacoes" | "transacoesMesaCamarote" | "transacoesIngresso") =>
     events.reduce((acc, event) => acc + event[key], 0);
   return {
@@ -595,7 +609,12 @@ export function Dashboard() {
               {expanded.has(client.clientId) &&
                 client.events.map((event) => (
                   <TableRow key={event.eventId} className="bg-neutral-50 hover:bg-neutral-50">
-                    <TableCell className="pl-8 text-sm text-neutral-600">{event.name}</TableCell>
+                    <TableCell className="pl-8 text-sm text-neutral-600">
+                      {event.name}
+                      {eventDayKey(event.date_ini) && (
+                        <span className="ml-2 text-xs text-neutral-400">{formatDayKey(eventDayKey(event.date_ini)!)}</span>
+                      )}
+                    </TableCell>
                     <TableCell />
                     <TableCell>
                       {isEventEncerrado(event, today) ? (
