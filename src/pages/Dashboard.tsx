@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import axios from "axios";
 import { CalendarCheck, ChevronRight, Search, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
-import type { DashboardOverview, ClientOverview } from "../types/dashboard";
+import type { DashboardOverview, ClientOverview, EventTotals } from "../types/dashboard";
 import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -22,6 +22,14 @@ const SPLIT_FILTER_OPTIONS: { value: SplitFilter; label: string }[] = [
   { value: "notSplit", label: "Não splitados" },
 ];
 
+type ClientStatusFilter = "all" | "active" | "inactive";
+
+const CLIENT_STATUS_FILTER_OPTIONS: { value: ClientStatusFilter; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "active", label: "Ativos" },
+  { value: "inactive", label: "Inativos" },
+];
+
 type DateFilter = "today" | "month" | "custom";
 
 const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
@@ -30,29 +38,107 @@ const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
   { value: "custom", label: "Personalizado" },
 ];
 
+type EncerradoFilter = "all" | "yes" | "no";
+
+const ENCERRADO_FILTER_OPTIONS: { value: EncerradoFilter; label: string }[] = [
+  { value: "all", label: "Todos" },
+  { value: "yes", label: "Sim" },
+  { value: "no", label: "Não" },
+];
+
 // YYYY-MM-DD no fuso local (toISOString converteria pra UTC e pode virar o dia).
-function toDateParam(date: Date) {
+function toDayKey(date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
-// Intervalo inclusivo [startDate, endDate]; null quando o personalizado ainda está incompleto/inválido.
+function eventDayKey(value: string | null | undefined) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : toDayKey(date);
+}
+
 function resolveDateRange(filter: DateFilter, customStart: string, customEnd: string) {
   const now = new Date();
   if (filter === "today") {
-    const today = toDateParam(now);
-    return { startDate: today, endDate: today };
+    const today = toDayKey(now);
+    return { start: today, end: today };
   }
   if (filter === "month") {
     return {
-      startDate: toDateParam(new Date(now.getFullYear(), now.getMonth(), 1)),
-      endDate: toDateParam(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+      start: toDayKey(new Date(now.getFullYear(), now.getMonth(), 1)),
+      end: toDayKey(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
     };
   }
   if (!customStart || !customEnd || customStart > customEnd) return null;
-  return { startDate: customStart, endDate: customEnd };
+  return { start: customStart, end: customEnd };
+}
+
+function isEventEncerrado(event: EventTotals, today: string) {
+  const end = eventDayKey(event.date_end);
+  return end ? end < today : !event.ativo;
+}
+
+function eventOverlapsRange(event: EventTotals, range: { start: string; end: string }) {
+  const start = eventDayKey(event.date_ini) ?? eventDayKey(event.date_end);
+  const end = eventDayKey(event.date_end) ?? start;
+  if (!start || !end) return true;
+  return start <= range.end && end >= range.start;
+}
+
+type DisplayClient = ClientOverview & { allEvents: EventTotals[] };
+
+function withFilteredEvents(client: ClientOverview, keep: (event: EventTotals) => boolean): DisplayClient {
+  const events = client.events.filter(keep);
+  const sum = (key: "totalVendido" | "totalTaxas" | "totalItens" | "totalTransacoes" | "transacoesMesaCamarote" | "transacoesIngresso") =>
+    events.reduce((acc, event) => acc + event[key], 0);
+  return {
+    ...client,
+    allEvents: client.events,
+    events,
+    totalVendido: sum("totalVendido"),
+    totalTaxas: sum("totalTaxas"),
+    totalItens: sum("totalItens"),
+    totalTransacoes: sum("totalTransacoes"),
+    transacoesMesaCamarote: sum("transacoesMesaCamarote"),
+    transacoesIngresso: sum("transacoesIngresso"),
+  };
+}
+
+function PillToggle<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <div className="inline-flex overflow-hidden rounded-md border border-input" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "h-9 whitespace-nowrap px-3 text-sm font-medium transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-input",
+            value === option.value
+              ? "bg-primary text-primary-foreground"
+              : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function formatCurrency(value: number) {
@@ -96,43 +182,32 @@ export function Dashboard() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [splitFilter, setSplitFilter] = useState<SplitFilter>("all");
+  const [clientStatusFilter, setClientStatusFilter] = useState<ClientStatusFilter>("all");
   const [onlyActiveEvents, setOnlyActiveEvents] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>("month");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [encerradoFilter, setEncerradoFilter] = useState<EncerradoFilter>("all");
   const [excludeTarget, setExcludeTarget] = useState<ClientOverview | null>(null);
   const [excluding, setExcluding] = useState(false);
 
-  const dateRange = resolveDateRange(dateFilter, customStart, customEnd);
-  const startDate = dateRange?.startDate;
-  const endDate = dateRange?.endDate;
-
   useEffect(() => {
-    if (!startDate || !endDate) return;
     const controller = new AbortController();
-    setLoading(true);
     api
-      .get<DashboardOverview>("/admin/listapix-dashboard/overview", {
-        params: { startDate, endDate },
-        signal: controller.signal,
-      })
+      .get<DashboardOverview>("/admin/listapix-dashboard/overview", { signal: controller.signal })
       .then((response) => setData(response.data))
       .catch((err) => {
         if (!axios.isCancel(err)) setError("Não foi possível carregar o dashboard.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [startDate, endDate]);
+  }, []);
 
   function selectDateFilter(value: DateFilter) {
     if (value === "custom" && !customStart && !customEnd) {
       const current = resolveDateRange(dateFilter, "", "");
       if (current) {
-        setCustomStart(current.startDate);
-        setCustomEnd(current.endDate);
+        setCustomStart(current.start);
+        setCustomEnd(current.end);
       }
     }
     setDateFilter(value);
@@ -189,18 +264,34 @@ export function Dashboard() {
   }
 
   const hasActiveFilters =
-    search.trim() !== "" || splitFilter !== "all" || onlyActiveEvents || dateFilter !== "month";
+    search.trim() !== "" ||
+    clientStatusFilter !== "all" ||
+    splitFilter !== "all" ||
+    onlyActiveEvents ||
+    dateFilter !== "month" ||
+    encerradoFilter !== "all";
   const invalidCustomRange = dateFilter === "custom" && customStart !== "" && customEnd !== "" && customStart > customEnd;
+
+  const today = toDayKey(new Date());
+  const dateRange = resolveDateRange(dateFilter, customStart, customEnd);
+
+  function keepEvent(event: EventTotals) {
+    if (dateRange && !eventOverlapsRange(event, dateRange)) return false;
+    if (encerradoFilter !== "all" && isEventEncerrado(event, today) !== (encerradoFilter === "yes")) return false;
+    return true;
+  }
 
   const filteredClients = data.clients
     .filter((client) => {
       const matchesSearch = client.name.toLowerCase().includes(search.trim().toLowerCase());
+      const matchesStatus =
+        clientStatusFilter === "all" || (clientStatusFilter === "active" ? client.ativo : !client.ativo);
       const matchesSplit =
         splitFilter === "all" || (splitFilter === "split" ? client.split : !client.split);
-      const eventosAtivos = client.events.filter((event) => event.ativo).length;
-      const matchesActiveEvents = !onlyActiveEvents || eventosAtivos > 0;
-      return matchesSearch && matchesSplit && matchesActiveEvents;
+      const matchesActiveEvents = !onlyActiveEvents || client.events.some((event) => event.ativo);
+      return matchesSearch && matchesStatus && matchesSplit && matchesActiveEvents;
     })
+    .map((client) => withFilteredEvents(client, keepEvent))
     .sort((a, b) => b.totalVendido - a.totalVendido);
 
   const clientEntries = (metric: "totalVendido" | "totalTaxas" | "totalTransacoes"): ColumnChartEntry[] =>
@@ -229,52 +320,6 @@ export function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl p-8">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="inline-flex overflow-hidden rounded-md border border-input" role="group" aria-label="Filtrar por período">
-          {DATE_FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={dateFilter === option.value}
-              onClick={() => selectDateFilter(option.value)}
-              className={cn(
-                "h-9 whitespace-nowrap px-3 text-sm font-medium transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-input",
-                dateFilter === option.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        {dateFilter === "custom" && (
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              aria-label="Data inicial"
-              value={customStart}
-              max={customEnd || undefined}
-              onChange={(e) => setCustomStart(e.target.value)}
-              className="h-9 w-auto"
-            />
-            <span className="text-sm text-neutral-500">até</span>
-            <Input
-              type="date"
-              aria-label="Data final"
-              value={customEnd}
-              min={customStart || undefined}
-              onChange={(e) => setCustomEnd(e.target.value)}
-              className="h-9 w-auto"
-            />
-          </div>
-        )}
-
-        {invalidCustomRange && <span className="text-sm text-red-600">Data inicial depois da final.</span>}
-        {loading && <span className="text-sm text-neutral-500">Carregando...</span>}
-      </div>
-
       <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-border pb-4">
         <span>
           <span className="text-sm text-neutral-500">Total vendido</span>{" "}
@@ -298,60 +343,95 @@ export function Dashboard() {
         </span>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 rounded-lg border border-border bg-neutral-50/60 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative sm:max-w-xs sm:flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-          <Input
-            placeholder="Buscar cliente..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      <div className="mb-4 divide-y divide-border rounded-lg border border-border bg-neutral-50/60">
+        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
+          <span className="w-16 shrink-0 text-xs font-medium uppercase tracking-wide text-neutral-500">Clientes</span>
+          <div className="relative lg:max-w-xs lg:flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+            <Input
+              placeholder="Buscar cliente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-9 pl-9"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PillToggle
+              label="Filtrar clientes por status"
+              options={CLIENT_STATUS_FILTER_OPTIONS}
+              value={clientStatusFilter}
+              onChange={setClientStatusFilter}
+            />
+            <PillToggle
+              label="Filtrar por status de split"
+              options={SPLIT_FILTER_OPTIONS}
+              value={splitFilter}
+              onChange={setSplitFilter}
+            />
+            <Button
+              type="button"
+              variant={onlyActiveEvents ? "default" : "outline"}
+              size="sm"
+              className="h-9"
+              aria-pressed={onlyActiveEvents}
+              onClick={() => setOnlyActiveEvents((prev) => !prev)}
+            >
+              <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+              Com eventos ativos
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex overflow-hidden rounded-md border border-input" role="group" aria-label="Filtrar por status de split">
-            {SPLIT_FILTER_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={splitFilter === option.value}
-                onClick={() => setSplitFilter(option.value)}
-                className={cn(
-                  "h-9 whitespace-nowrap px-3 text-sm font-medium transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-input",
-                  splitFilter === option.value
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-col gap-3 p-3 lg:flex-row lg:items-center">
+          <span className="w-16 shrink-0 text-xs font-medium uppercase tracking-wide text-neutral-500">Eventos</span>
+          <div className="flex flex-1 flex-wrap items-center gap-2">
+            <PillToggle label="Filtrar eventos por período" options={DATE_FILTER_OPTIONS} value={dateFilter} onChange={selectDateFilter} />
 
-          <Button
-            type="button"
-            variant={onlyActiveEvents ? "default" : "outline"}
-            size="sm"
-            className="h-9"
-            aria-pressed={onlyActiveEvents}
-            onClick={() => setOnlyActiveEvents((prev) => !prev)}
-          >
-            <CalendarCheck className="h-4 w-4" aria-hidden="true" />
-            Com eventos ativos
-          </Button>
+            {dateFilter === "custom" && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  aria-label="Data inicial"
+                  value={customStart}
+                  max={customEnd || undefined}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="h-9 w-auto"
+                />
+                <span className="text-sm text-neutral-500">até</span>
+                <Input
+                  type="date"
+                  aria-label="Data final"
+                  value={customEnd}
+                  min={customStart || undefined}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="h-9 w-auto"
+                />
+              </div>
+            )}
+            {invalidCustomRange && <span className="text-sm text-red-600">Data inicial depois da final.</span>}
+
+            <span className="ml-2 text-sm text-neutral-500">Encerrado</span>
+            <PillToggle
+              label="Filtrar eventos encerrados"
+              options={ENCERRADO_FILTER_OPTIONS}
+              value={encerradoFilter}
+              onChange={setEncerradoFilter}
+            />
+          </div>
 
           {hasActiveFilters && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 text-neutral-500 hover:text-foreground"
+              className="h-9 self-start text-neutral-500 hover:text-foreground lg:self-auto"
               onClick={() => {
                 setSearch("");
+                setClientStatusFilter("all");
                 setSplitFilter("all");
                 setOnlyActiveEvents(false);
                 setDateFilter("month");
+                setEncerradoFilter("all");
               }}
             >
               <X className="h-4 w-4" aria-hidden="true" />
@@ -386,7 +466,7 @@ export function Dashboard() {
               </TableCell>
             </TableRow>
           )}
-          {filteredClients.map((client: ClientOverview) => (
+          {filteredClients.map((client) => (
             <Fragment key={client.clientId}>
               <TableRow
                 className="cursor-pointer"
@@ -412,8 +492,8 @@ export function Dashboard() {
                     {client.name}
                   </span>
                 </TableCell>
-                <TableCell>{client.events.length}</TableCell>
-                <TableCell>{client.events.filter((event) => event.ativo).length}</TableCell>
+                <TableCell>{client.allEvents.length}</TableCell>
+                <TableCell>{client.allEvents.filter((event) => event.ativo).length}</TableCell>
                 <TableCell>
                   <TransacoesCell
                     total={client.totalTransacoes}
@@ -433,7 +513,8 @@ export function Dashboard() {
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setExcludeTarget(client);
+                      // Original (sem filtro de evento): o resumo desconta os totais cheios do cliente.
+                      setExcludeTarget(data.clients.find((c) => c.clientId === client.clientId) ?? null);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -447,9 +528,15 @@ export function Dashboard() {
                     <TableCell className="pl-8 text-sm text-neutral-600">{event.name}</TableCell>
                     <TableCell />
                     <TableCell>
-                      <Badge variant={event.ativo ? "default" : "secondary"} className="text-xs">
-                        {event.ativo ? "Ativo" : "Encerrado"}
-                      </Badge>
+                      {isEventEncerrado(event, today) ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Encerrado
+                        </Badge>
+                      ) : (
+                        <Badge variant={event.ativo ? "default" : "outline"} className="text-xs">
+                          {event.ativo ? "Ativo" : "Inativo"}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <TransacoesCell

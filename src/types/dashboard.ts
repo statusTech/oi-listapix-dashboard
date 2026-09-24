@@ -2,6 +2,8 @@ export interface EventTotals {
   eventId: string;
   name: string;
   ativo: boolean;
+  date_ini: string | null;
+  date_end: string | null;
   totalVendido: number;
   totalTaxas: number;
   totalItens: number;
@@ -13,6 +15,7 @@ export interface EventTotals {
 export interface ClientOverview {
   clientId: string;
   name: string;
+  ativo: boolean;
   split: boolean;
   totalVendido: number;
   totalTaxas: number;
