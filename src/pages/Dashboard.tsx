@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import axios from "axios";
-import { CalendarCheck, ChevronRight, Search, Trash2, X } from "lucide-react";
+import { CalendarCheck, ChevronDown, ChevronRight, ChevronsUpDown, ChevronUp, Search, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import type { DashboardOverview, ClientOverview, EventTotals } from "../types/dashboard";
 import { Card, CardContent } from "../components/ui/card";
@@ -108,6 +108,63 @@ function withFilteredEvents(client: ClientOverview, keep: (event: EventTotals) =
   };
 }
 
+type SortKey = "name" | "totalEventos" | "eventosAtivos" | "totalTransacoes" | "totalVendido" | "totalTaxas" | "split";
+type SortDirection = "asc" | "desc";
+type SortState = { key: SortKey; direction: SortDirection } | null;
+
+function sortValue(client: DisplayClient, key: SortKey): string | number {
+  switch (key) {
+    case "name":
+      return client.name.toLocaleLowerCase("pt-BR");
+    case "totalEventos":
+      return client.allEvents.length;
+    case "eventosAtivos":
+      return client.allEvents.filter((event) => event.ativo).length;
+    case "split":
+      return client.split ? 1 : 0;
+    default:
+      return client[key];
+  }
+}
+
+function compareClients(a: DisplayClient, b: DisplayClient, key: SortKey, direction: SortDirection) {
+  const va = sortValue(a, key);
+  const vb = sortValue(b, key);
+  const result = typeof va === "string" ? va.localeCompare(vb as string, "pt-BR") : va - (vb as number);
+  return direction === "asc" ? result : -result;
+}
+
+function SortableHead({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState;
+  onSort: (key: SortKey) => void;
+}) {
+  const direction = sort?.key === sortKey ? sort.direction : null;
+  const active = direction !== null;
+  const Icon = !direction ? ChevronsUpDown : direction === "asc" ? ChevronUp : ChevronDown;
+  return (
+    <TableHead aria-sort={!direction ? "none" : direction === "asc" ? "ascending" : "descending"}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-foreground",
+          active && "text-foreground",
+        )}
+      >
+        {label}
+        <Icon className={cn("h-4 w-4 shrink-0", active ? "text-blue-600" : "text-neutral-400")} aria-hidden="true" />
+      </button>
+    </TableHead>
+  );
+}
+
 function PillToggle<T extends string>({
   label,
   options,
@@ -188,6 +245,10 @@ export function Dashboard() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [encerradoFilter, setEncerradoFilter] = useState<EncerradoFilter>("all");
+  const [sort, setSort] = useState<SortState>({
+    key: "totalVendido",
+    direction: "desc",
+  });
   const [excludeTarget, setExcludeTarget] = useState<ClientOverview | null>(null);
   const [excluding, setExcluding] = useState(false);
 
@@ -211,6 +272,15 @@ export function Dashboard() {
       }
     }
     setDateFilter(value);
+  }
+
+  function handleSort(key: SortKey) {
+    const first: SortDirection = key === "name" ? "asc" : "desc";
+    setSort((prev) => {
+      if (prev?.key !== key) return { key, direction: first };
+      if (prev.direction === first) return { key, direction: first === "asc" ? "desc" : "asc" };
+      return null;
+    });
   }
 
   function toggleExpanded(clientId: string) {
@@ -292,7 +362,7 @@ export function Dashboard() {
       return matchesSearch && matchesStatus && matchesSplit && matchesActiveEvents;
     })
     .map((client) => withFilteredEvents(client, keepEvent))
-    .sort((a, b) => b.totalVendido - a.totalVendido);
+    .sort((a, b) => (sort ? compareClients(a, b, sort.key, sort.direction) : 0));
 
   const clientEntries = (metric: "totalVendido" | "totalTaxas" | "totalTransacoes"): ColumnChartEntry[] =>
     filteredClients.map((client) => ({
@@ -448,13 +518,13 @@ export function Dashboard() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Total de eventos</TableHead>
-            <TableHead>Eventos ativos</TableHead>
-            <TableHead>Transações</TableHead>
-            <TableHead>Total vendido</TableHead>
-            <TableHead>Total de taxas</TableHead>
-            <TableHead>Split</TableHead>
+            <SortableHead label="Cliente" sortKey="name" sort={sort} onSort={handleSort} />
+            <SortableHead label="Total de eventos" sortKey="totalEventos" sort={sort} onSort={handleSort} />
+            <SortableHead label="Eventos ativos" sortKey="eventosAtivos" sort={sort} onSort={handleSort} />
+            <SortableHead label="Transações" sortKey="totalTransacoes" sort={sort} onSort={handleSort} />
+            <SortableHead label="Total vendido" sortKey="totalVendido" sort={sort} onSort={handleSort} />
+            <SortableHead label="Total de taxas" sortKey="totalTaxas" sort={sort} onSort={handleSort} />
+            <SortableHead label="Split" sortKey="split" sort={sort} onSort={handleSort} />
             <TableHead>Ações</TableHead>
           </TableRow>
         </TableHeader>
