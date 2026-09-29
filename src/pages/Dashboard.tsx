@@ -92,18 +92,20 @@ function resolveDateRange(filter: DateFilter, customStart: string, customEnd: st
 }
 
 function isEventEncerrado(event: EventTotals, today: string) {
-  const end = eventDayKey(event.date_end);
-  return end ? end < today : !event.ativo;
+  const start = eventDayKey(event.date_ini);
+  if (!start) return false;
+  const end = eventDayKey(event.date_end) ?? start;
+  return end < today;
 }
 
 function eventOverlapsRange(event: EventTotals, range: { start: string; end: string }) {
-  const start = eventDayKey(event.date_ini) ?? eventDayKey(event.date_end);
+  const start = eventDayKey(event.date_ini);
+  if (!start) return true;
   const end = eventDayKey(event.date_end) ?? start;
-  if (!start || !end) return true;
   return start <= range.end && end >= range.start;
 }
 
-type DisplayClient = ClientOverview & { allEvents: EventTotals[] };
+type DisplayClient = ClientOverview;
 
 function withFilteredEvents(client: ClientOverview, keep: (event: EventTotals) => boolean): DisplayClient {
   const events = client.events.filter(keep).sort(compareEventsByStartDesc);
@@ -111,7 +113,6 @@ function withFilteredEvents(client: ClientOverview, keep: (event: EventTotals) =
     events.reduce((acc, event) => acc + event[key], 0);
   return {
     ...client,
-    allEvents: client.events,
     events,
     totalVendido: sum("totalVendido"),
     totalTaxas: sum("totalTaxas"),
@@ -131,9 +132,9 @@ function sortValue(client: DisplayClient, key: SortKey): string | number {
     case "name":
       return client.name.toLocaleLowerCase("pt-BR");
     case "totalEventos":
-      return client.allEvents.length;
+      return client.events.length;
     case "eventosAtivos":
-      return client.allEvents.filter((event) => event.ativo).length;
+      return client.events.filter((event) => event.ativo).length;
     case "split":
       return client.split ? 1 : 0;
     default:
@@ -376,6 +377,7 @@ export function Dashboard() {
       return matchesSearch && matchesStatus && matchesSplit && matchesActiveEvents;
     })
     .map((client) => withFilteredEvents(client, keepEvent))
+    .filter((client) => client.events.length > 0)
     .sort((a, b) => (sort ? compareClients(a, b, sort.key, sort.direction) : 0));
 
   const clientEntries = (metric: "totalVendido" | "totalTaxas" | "totalTransacoes"): ColumnChartEntry[] =>
@@ -576,8 +578,8 @@ export function Dashboard() {
                     {client.name}
                   </span>
                 </TableCell>
-                <TableCell>{client.allEvents.length}</TableCell>
-                <TableCell>{client.allEvents.filter((event) => event.ativo).length}</TableCell>
+                <TableCell>{client.events.length}</TableCell>
+                <TableCell>{client.events.filter((event) => event.ativo).length}</TableCell>
                 <TableCell>
                   <TransacoesCell
                     total={client.totalTransacoes}
