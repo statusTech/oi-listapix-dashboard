@@ -5,10 +5,21 @@ import { api } from "../lib/api";
 
 // Mesma allowlist de UID usada em admin/src/service/auth.js:8,18 — mesmos 2
 // super-admins de hoje, mesmo projeto Firebase.
-const ALLOWED_UIDS = ["mIx721WKurVotrfVmggEOqKYCfl1", "mxG5BZs7hUd1qsas4wKH6Lh0fZg1"];
+export type Role = "master";
+
+// UID -> papel. Todo UID da allowlist é master hoje; novos papéis entram aqui.
+const UID_ROLES: Record<string, Role> = {
+  mIx721WKurVotrfVmggEOqKYCfl1: "master",
+  mxG5BZs7hUd1qsas4wKH6Lh0fZg1: "master",
+};
+
+function roleFromUid(uid: string | undefined): Role | null {
+  return (uid && UID_ROLES[uid]) || null;
+}
 
 interface AuthContextValue {
   token: string | null;
+  role: Role | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
@@ -18,11 +29,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("token"));
+  const [role, setRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user || !ALLOWED_UIDS.includes(user.uid)) {
+      const userRole = roleFromUid(user?.uid);
+      setRole(userRole);
+      if (!userRole) {
         setToken(null);
         localStorage.removeItem("token");
       }
@@ -34,11 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     try {
       const credential = await signInWithEmailAndPassword(auth, email, password);
-      if (!ALLOWED_UIDS.includes(credential.user.uid)) {
+      const userRole = roleFromUid(credential.user.uid);
+      if (!userRole) {
         await signOut(auth);
         return { error: "Usuario sem permissao de acesso a este painel." };
       }
       const response = await api.post("/authenticateDash", { userKey: credential.user.uid });
+      setRole(userRole);
       setToken(response.data.token);
       localStorage.setItem("token", response.data.token);
       return { error: null };
@@ -50,11 +66,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await signOut(auth);
+    setRole(null);
     setToken(null);
     localStorage.removeItem("token");
   }
 
-  return <AuthContext.Provider value={{ token, loading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ token, role, loading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

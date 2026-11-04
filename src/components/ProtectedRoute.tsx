@@ -1,9 +1,15 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, type Role } from "../context/AuthContext";
 
-export function ProtectedRoute() {
-  const { token, loading } = useAuth();
+interface ProtectedRouteProps {
+  /** Papéis com acesso. Sem a prop, basta estar logado com qualquer papel. */
+  allowedRoles?: Role[];
+}
+
+export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
+  const { token, role, loading } = useAuth();
   if (loading) return null;
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token || !role) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(role)) return <Navigate to="/" replace />;
   return <Outlet />;
 }
