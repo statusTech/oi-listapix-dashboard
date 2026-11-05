@@ -40,3 +40,22 @@ export interface IngressosFilters {
   provider: "" | IngressoProvider;
   error: string;
 }
+
+export interface SplitLog {
+  id: string;
+  occurredAt: string; // ISO
+  clientId: string;
+  clientName: string;
+  eventName: string;
+  orderRef: string;
+  amount: number; // em reais
+  reason: string;
+}
+
+export interface SplitFilters {
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+  client: string;
+  event: string;
+  reason: string;
+}
