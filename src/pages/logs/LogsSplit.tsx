@@ -5,40 +5,37 @@ import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Pagination } from "../../components/Pagination";
 import { FilterField, FilterSelect } from "../../components/FilterField";
-import { fetchSplitLogs, MOCK_SPLIT_CLIENTS, MOCK_SPLIT_REASONS } from "../../lib/mock/split";
+import { api } from "../../lib/api";
+import { cleanParams, defaultPeriod, errorMessage, formatDateTime, useClientOptions } from "../../lib/logs";
 import type { Paginated, SplitFilters, SplitLog } from "../../types/logs";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-function toInputDate(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 function defaultFilters(): SplitFilters {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 7);
-  return { from: toInputDate(from), to: toInputDate(to), client: "", event: "", reason: "" };
+  return { ...defaultPeriod(), clientId: "", eventName: "", reason: "" };
 }
 
 export function LogsSplit() {
   const [filters, setFilters] = useState<SplitFilters>(defaultFilters);
-  const [applied, setApplied] = useState({ from: filters.from, to: filters.to });
+  const [applied, setApplied] = useState<SplitFilters>(filters);
   const [page, setPage] = useState(1);
   const [data, setData] = useState<Paginated<SplitLog> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const clients = useClientOptions();
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
     setError(null);
-    fetchSplitLogs(applied, page, PAGE_SIZE)
-      .then((result) => !cancelled && setData(result))
-      .catch(() => !cancelled && setError("Não foi possível carregar os logs de split."));
+    api
+      .get<Paginated<SplitLog>>("/admin/listapix-dashboard/logs/split", {
+        params: cleanParams({ ...applied, page, limit: PAGE_SIZE }),
+      })
+      .then((res) => !cancelled && setData(res.data))
+      .catch((err) => !cancelled && setError(errorMessage(err, "Não foi possível carregar os logs de split.")));
     return () => {
       cancelled = true;
     };
@@ -50,7 +47,7 @@ export function LogsSplit() {
 
   function search() {
     setPage(1);
-    setApplied({ from: filters.from, to: filters.to });
+    setApplied(filters);
     setReloadKey((k) => k + 1);
   }
 
@@ -58,18 +55,9 @@ export function LogsSplit() {
     const fresh = defaultFilters();
     setFilters(fresh);
     setPage(1);
-    setApplied({ from: fresh.from, to: fresh.to });
+    setApplied(fresh);
     setReloadKey((k) => k + 1);
   }
-
-  // Cliente, evento e motivo filtram apenas os itens já carregados na tela.
-  const visibleItems = (data?.items ?? []).filter((log) => {
-    const event = filters.event.trim().toLowerCase();
-    if (filters.client && log.clientName !== filters.client) return false;
-    if (event && !log.eventName.toLowerCase().includes(event)) return false;
-    if (filters.reason && log.reason !== filters.reason) return false;
-    return true;
-  });
 
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8">
@@ -83,33 +71,26 @@ export function LogsSplit() {
         }}
       >
         <FilterField label="De">
-          <Input type="date" value={filters.from} onChange={(e) => set("from", e.target.value)} />
+          <Input type="date" value={filters.dateStart} onChange={(e) => set("dateStart", e.target.value)} />
         </FilterField>
         <FilterField label="Até">
-          <Input type="date" value={filters.to} onChange={(e) => set("to", e.target.value)} />
+          <Input type="date" value={filters.dateEnd} onChange={(e) => set("dateEnd", e.target.value)} />
         </FilterField>
         <FilterField label="Cliente">
-          <FilterSelect value={filters.client} onChange={(e) => set("client", e.target.value)}>
+          <FilterSelect value={filters.clientId} onChange={(e) => set("clientId", e.target.value)}>
             <option value="">Todos</option>
-            {MOCK_SPLIT_CLIENTS.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </FilterSelect>
         </FilterField>
         <FilterField label="Evento">
-          <Input placeholder="Nome do evento" value={filters.event} onChange={(e) => set("event", e.target.value)} />
+          <Input placeholder="Nome do evento" value={filters.eventName} onChange={(e) => set("eventName", e.target.value)} />
         </FilterField>
         <FilterField label="Motivo">
-          <FilterSelect value={filters.reason} onChange={(e) => set("reason", e.target.value)}>
-            <option value="">Todos</option>
-            {MOCK_SPLIT_REASONS.map((reason) => (
-              <option key={reason} value={reason}>
-                {reason}
-              </option>
-            ))}
-          </FilterSelect>
+          <Input placeholder="Parte do motivo" value={filters.reason} onChange={(e) => set("reason", e.target.value)} />
         </FilterField>
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3 lg:justify-end">
           <Button type="button" variant="outline" onClick={clearFilters}>
@@ -143,21 +124,19 @@ export function LogsSplit() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {visibleItems.length === 0 && (
+                {data.items.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-sm text-neutral-500">
                       Nenhum log no período
                     </TableCell>
                   </TableRow>
                 )}
-                {visibleItems.map((log) => (
+                {data.items.map((log) => (
                   <TableRow key={log.id}>
-                    <TableCell className="whitespace-nowrap">
-                      {new Date(log.occurredAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
-                    </TableCell>
-                    <TableCell>{log.clientName}</TableCell>
-                    <TableCell>{log.eventName}</TableCell>
-                    <TableCell className="whitespace-nowrap">{log.orderRef}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatDateTime(log.occurred_at)}</TableCell>
+                    <TableCell>{log.client.name ?? "—"}</TableCell>
+                    <TableCell>{log.event.name}</TableCell>
+                    <TableCell className="whitespace-nowrap">{log.order_id ?? "—"}</TableCell>
                     <TableCell className="whitespace-nowrap text-right">{currency.format(log.amount)}</TableCell>
                     <TableCell>{log.reason}</TableCell>
                   </TableRow>
@@ -165,7 +144,10 @@ export function LogsSplit() {
               </TableBody>
             </Table>
           </div>
-          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onChange={setPage} />
+          <p className="mt-2 text-xs text-neutral-500">
+            Período: {data.period.dateStart} a {data.period.dateEnd}
+          </p>
+          <Pagination page={data.page} pageSize={data.limit} total={data.total} onChange={setPage} />
         </>
       )}
     </div>

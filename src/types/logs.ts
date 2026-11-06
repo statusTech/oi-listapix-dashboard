@@ -1,10 +1,17 @@
-// Contrato com GET /admin/listapix-dashboard/logs/* (ver docs/task-backend-1.md)
+// Contrato com GET /admin/listapix-dashboard/logs/* (ver docs/FRONTEND_DASHBOARD_LOGS.md)
+
+export interface LogsPeriod {
+  dateStart: string; // AAAA-MM-DD (Brasília)
+  dateEnd: string;
+}
 
 export interface Paginated<T> {
+  success: boolean;
   items: T[];
-  page: number;
-  pageSize: number;
   total: number;
+  page: number;
+  limit: number;
+  period: LogsPeriod;
 }
 
 export type IngressoChannel = "whatsapp" | "email";
@@ -13,27 +20,28 @@ export type IngressoProvider = "smsbarato" | "zapi" | "email";
 export type IngressoStatus = "success" | "failed";
 
 export interface IngressoLog {
-  id: string;
-  sentAt: string; // ISO
-  clientId: string;
-  clientName: string;
-  eventName: string;
-  orderRef: string;
-  buyerName: string;
+  id: string; // único entre clientes
+  sent_at: string; // ISO UTC
+  client: { id: string; name: string | null };
+  event: { id: string; name: string };
+  order_id: string;
+  reference: string | null;
+  buyer_name: string;
   recipient: string; // já mascarado pelo backend
   channel: IngressoChannel;
   origin: IngressoOrigin;
-  provider: IngressoProvider;
-  usedFallback: boolean;
   status: IngressoStatus;
-  error: { code: string; message: string } | null;
+  provider: IngressoProvider;
+  used_fallback: boolean;
+  error: { code: string; text: string } | null;
+  fallback_reason: { code: string; text: string } | null;
 }
 
 export interface IngressosFilters {
-  from: string; // YYYY-MM-DD
-  to: string; // YYYY-MM-DD
-  client: string;
-  event: string;
+  dateStart: string;
+  dateEnd: string;
+  clientId: string;
+  eventName: string;
   status: "" | IngressoStatus;
   channel: "" | IngressoChannel;
   origin: "" | IngressoOrigin;
@@ -42,20 +50,19 @@ export interface IngressosFilters {
 }
 
 export interface SplitLog {
-  id: string;
-  occurredAt: string; // ISO
-  clientId: string;
-  clientName: string;
-  eventName: string;
-  orderRef: string;
+  id: number;
+  occurred_at: string; // ISO UTC
+  client: { id: string; name: string | null };
+  event: { id: string; name: string };
+  order_id: string | null;
   amount: number; // em reais
   reason: string;
 }
 
 export interface SplitFilters {
-  from: string; // YYYY-MM-DD
-  to: string; // YYYY-MM-DD
-  client: string;
-  event: string;
+  dateStart: string;
+  dateEnd: string;
+  clientId: string;
+  eventName: string;
   reason: string;
 }

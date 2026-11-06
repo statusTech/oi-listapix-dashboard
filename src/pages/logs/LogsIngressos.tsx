@@ -6,30 +6,22 @@ import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Pagination } from "../../components/Pagination";
 import { FilterField, FilterSelect } from "../../components/FilterField";
-import { fetchIngressosLogs, MOCK_INGRESSO_CLIENTS } from "../../lib/mock/ingressos";
+import { api } from "../../lib/api";
+import { cleanParams, defaultPeriod, errorMessage, formatDateTime, useClientOptions } from "../../lib/logs";
 import type { IngressoLog, IngressosFilters, Paginated } from "../../types/logs";
 import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 const CHANNEL_LABEL = { whatsapp: "WhatsApp", email: "E-mail" } as const;
 const ORIGIN_LABEL = { store: "Loja", panel: "Painel" } as const;
 const PROVIDER_LABEL = { smsbarato: "SMS Barato", zapi: "Z-API", email: "E-mail" } as const;
 
-function toInputDate(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 function defaultFilters(): IngressosFilters {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 7);
   return {
-    from: toInputDate(from),
-    to: toInputDate(to),
-    client: "",
-    event: "",
+    ...defaultPeriod(),
+    clientId: "",
+    eventName: "",
     status: "",
     channel: "",
     origin: "",
@@ -45,14 +37,18 @@ export function LogsIngressos() {
   const [data, setData] = useState<Paginated<IngressoLog> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const clients = useClientOptions();
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
     setError(null);
-    fetchIngressosLogs(applied, page, PAGE_SIZE)
-      .then((result) => !cancelled && setData(result))
-      .catch(() => !cancelled && setError("Não foi possível carregar os logs de ingressos."));
+    api
+      .get<Paginated<IngressoLog>>("/admin/listapix-dashboard/logs/ingressos", {
+        params: cleanParams({ ...applied, page, limit: PAGE_SIZE }),
+      })
+      .then((res) => !cancelled && setData(res.data))
+      .catch((err) => !cancelled && setError(errorMessage(err, "Não foi possível carregar os logs de ingressos.")));
     return () => {
       cancelled = true;
     };
@@ -87,17 +83,17 @@ export function LogsIngressos() {
         }}
       >
         <FilterField label="De">
-          <Input type="date" value={filters.from} onChange={(e) => set("from", e.target.value)} />
+          <Input type="date" value={filters.dateStart} onChange={(e) => set("dateStart", e.target.value)} />
         </FilterField>
         <FilterField label="Até">
-          <Input type="date" value={filters.to} onChange={(e) => set("to", e.target.value)} />
+          <Input type="date" value={filters.dateEnd} onChange={(e) => set("dateEnd", e.target.value)} />
         </FilterField>
         <FilterField label="Cliente">
-          <FilterSelect value={filters.client} onChange={(e) => set("client", e.target.value)}>
+          <FilterSelect value={filters.clientId} onChange={(e) => set("clientId", e.target.value)}>
             <option value="">Todos</option>
-            {MOCK_INGRESSO_CLIENTS.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </FilterSelect>
@@ -105,15 +101,15 @@ export function LogsIngressos() {
         <FilterField label="Evento">
           <Input
             placeholder="Nome do evento"
-            value={filters.event}
-            onChange={(e) => set("event", e.target.value)}
+            value={filters.eventName}
+            onChange={(e) => set("eventName", e.target.value)}
           />
         </FilterField>
         <FilterField label="Status">
           <FilterSelect value={filters.status} onChange={(e) => set("status", e.target.value as IngressosFilters["status"])}>
             <option value="">Todos</option>
-            <option value="success">Sucesso</option>
-            <option value="failed">Falha</option>
+            <option value="success">Enviado</option>
+            <option value="failed">Falhou</option>
           </FilterSelect>
         </FilterField>
         <FilterField label="Canal">
@@ -139,7 +135,7 @@ export function LogsIngressos() {
           </FilterSelect>
         </FilterField>
         <FilterField label="Erro (código ou texto)">
-          <Input placeholder="Ex.: ZAPI_NOT_CONNECTED" value={filters.error} onChange={(e) => set("error", e.target.value)} />
+          <Input placeholder="Ex.: SMSBARATO_NUMERO_EXCLUIDO" value={filters.error} onChange={(e) => set("error", e.target.value)} />
         </FilterField>
         <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3 lg:justify-end">
           <Button type="button" variant="outline" onClick={clearFilters}>
@@ -189,26 +185,26 @@ export function LogsIngressos() {
                 {data.items.map((log) => (
                   <TableRow key={log.id} className={cn(log.status === "failed" && "bg-red-50 hover:bg-red-100")}>
                     <TableCell className="whitespace-nowrap">
-                      {new Date(log.sentAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                      {formatDateTime(log.sent_at)}
                     </TableCell>
-                    <TableCell>{log.clientName}</TableCell>
-                    <TableCell>{log.eventName}</TableCell>
-                    <TableCell className="whitespace-nowrap">{log.orderRef}</TableCell>
-                    <TableCell>{log.buyerName}</TableCell>
+                    <TableCell>{log.client.name ?? "—"}</TableCell>
+                    <TableCell>{log.event.name}</TableCell>
+                    <TableCell className="whitespace-nowrap">{log.reference ?? log.order_id}</TableCell>
+                    <TableCell>{log.buyer_name}</TableCell>
                     <TableCell className="whitespace-nowrap">{log.recipient}</TableCell>
                     <TableCell>{CHANNEL_LABEL[log.channel]}</TableCell>
                     <TableCell>{ORIGIN_LABEL[log.origin]}</TableCell>
                     <TableCell>{PROVIDER_LABEL[log.provider]}</TableCell>
-                    <TableCell>{log.usedFallback ? "Sim" : "Não"}</TableCell>
+                    <TableCell title={log.fallback_reason?.text}>{log.used_fallback ? "Sim" : "Não"}</TableCell>
                     <TableCell>
                       <Badge variant={log.status === "failed" ? "destructive" : "secondary"}>
-                        {log.status === "failed" ? "Falha" : "Sucesso"}
+                        {log.status === "failed" ? "Falhou" : "Enviado"}
                       </Badge>
                     </TableCell>
                     <TableCell className="min-w-56">
                       {log.error ? (
                         <>
-                          <p className="text-sm text-red-700">{log.error.message}</p>
+                          <p className="text-sm text-red-700">{log.error.text}</p>
                           <p className="font-mono text-xs text-neutral-500">{log.error.code}</p>
                         </>
                       ) : (
@@ -220,7 +216,7 @@ export function LogsIngressos() {
               </TableBody>
             </Table>
           </div>
-          <Pagination page={data.page} pageSize={data.pageSize} total={data.total} onChange={setPage} />
+          <Pagination page={data.page} pageSize={data.limit} total={data.total} onChange={setPage} />
         </>
       )}
     </div>
