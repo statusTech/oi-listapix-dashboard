@@ -75,17 +75,21 @@ function compareEventsByStartDesc(a: EventTotals, b: EventTotals) {
   return sa < sb ? 1 : -1;
 }
 
+// Dia de hoje em Brasília (a venda é filtrada pelo dia de Brasília no backend).
+function brtTodayKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
 function resolveDateRange(filter: DateFilter, customStart: string, customEnd: string) {
-  const now = new Date();
+  const today = brtTodayKey();
   if (filter === "today") {
-    const today = toDayKey(now);
     return { start: today, end: today };
   }
   if (filter === "month") {
-    return {
-      start: toDayKey(new Date(now.getFullYear(), now.getMonth(), 1)),
-      end: toDayKey(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-    };
+    const [y, m] = today.split("-").map(Number);
+    const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const mm = String(m).padStart(2, "0");
+    return { start: `${y}-${mm}-01`, end: `${y}-${mm}-${String(lastDay).padStart(2, "0")}` };
   }
   if (!customStart || !customEnd || customStart > customEnd) return null;
   return { start: customStart, end: customEnd };
@@ -98,11 +102,30 @@ function isEventEncerrado(event: EventTotals, today: string) {
   return end < today;
 }
 
-function eventOverlapsRange(event: EventTotals, range: { start: string; end: string }) {
-  const start = eventDayKey(event.date_ini);
-  if (!start) return true;
-  const end = eventDayKey(event.date_end) ?? start;
-  return start <= range.end && end >= range.start;
+function addDays(dayKey: string, days: number) {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+// Limite do filtro: evento mais distante (date_end, ou date_ini sem date_end) + 1 dia.
+function resolveMaxFilterDate(clients: ClientOverview[]) {
+  let max: string | null = null;
+  for (const client of clients) {
+    for (const event of client.events) {
+      const key = eventDayKey(event.date_end) ?? eventDayKey(event.date_ini);
+      if (key && (!max || key > max)) max = key;
+    }
+  }
+  return max ? addDays(max, 1) : undefined;
+}
+
+// Nomes dos query params da rota de overview (período = data da venda, dia de Brasília).
+const PERIOD_PARAM_START = "dateStart";
+const PERIOD_PARAM_END = "dateEnd";
+
+// Com período, o backend zera os eventos sem venda no período.
+function eventHasSalesInPeriod(event: EventTotals) {
+  return event.totalTransacoes > 0;
 }
 
 type DisplayClient = ClientOverview;
@@ -267,16 +290,45 @@ export function Dashboard() {
   const [excludeTarget, setExcludeTarget] = useState<ClientOverview | null>(null);
   const [excluding, setExcluding] = useState(false);
 
+  const dateRange = resolveDateRange(dateFilter, customStart, customEnd);
+  const rangeStart = dateRange?.start;
+  const rangeEnd = dateRange?.end;
+  const [loading, setLoading] = useState(false);
+  // Com período a API pode omitir eventos sem venda; o limite do filtro precisa de todos os eventos.
+  const [allClients, setAllClients] = useState<ClientOverview[]>([]);
+
   useEffect(() => {
     const controller = new AbortController();
     api
       .get<DashboardOverview>("/admin/listapix-dashboard/overview", { signal: controller.signal })
-      .then((response) => setData(response.data))
-      .catch((err) => {
-        if (!axios.isCancel(err)) setError("Não foi possível carregar o dashboard.");
-      });
+      .then((response) => setAllClients(response.data.clients))
+      .catch(() => {});
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    // Personalizado incompleto/inválido: mantém os dados atuais até o período ficar válido.
+    if (dateFilter === "custom" && !dateRange) return;
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    api
+      .get<DashboardOverview>("/admin/listapix-dashboard/overview", {
+        signal: controller.signal,
+        params: dateRange ? { [PERIOD_PARAM_START]: dateRange.start, [PERIOD_PARAM_END]: dateRange.end } : undefined,
+      })
+      .then((response) => {
+        setData(response.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+        setError("Não foi possível carregar o dashboard.");
+        setLoading(false);
+      });
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilter, rangeStart, rangeEnd]);
 
   function selectDateFilter(value: DateFilter) {
     if (value === "custom" && !customStart && !customEnd) {
@@ -357,11 +409,11 @@ export function Dashboard() {
     encerradoFilter !== "all";
   const invalidCustomRange = dateFilter === "custom" && customStart !== "" && customEnd !== "" && customStart > customEnd;
 
-  const today = toDayKey(new Date());
-  const dateRange = resolveDateRange(dateFilter, customStart, customEnd);
+  const today = brtTodayKey();
+  const maxFilterDate = resolveMaxFilterDate([...data.clients, ...allClients]);
 
   function keepEvent(event: EventTotals) {
-    if (dateRange && !eventOverlapsRange(event, dateRange)) return false;
+    if (dateRange && !eventHasSalesInPeriod(event)) return false;
     if (encerradoFilter !== "all" && isEventEncerrado(event, today) !== (encerradoFilter === "yes")) return false;
     return true;
   }
@@ -405,7 +457,7 @@ export function Dashboard() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className={cn("mx-auto max-w-7xl p-8 transition-opacity", loading && "opacity-60")} aria-busy={loading}>
       <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-border pb-4">
         <span>
           <span className="text-sm text-neutral-500">Total vendido</span>{" "}
@@ -479,8 +531,13 @@ export function Dashboard() {
                   type="date"
                   aria-label="Data inicial"
                   value={customStart}
-                  max={customEnd || undefined}
-                  onChange={(e) => setCustomStart(e.target.value)}
+                  max={maxFilterDate}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setCustomStart(value);
+                    // Início passou do fim: empurra o fim junto pra não ficar um período inválido.
+                    if (value && customEnd && value > customEnd) setCustomEnd(value);
+                  }}
                   className="h-9 w-auto"
                 />
                 <span className="text-sm text-neutral-500">até</span>
@@ -489,6 +546,7 @@ export function Dashboard() {
                   aria-label="Data final"
                   value={customEnd}
                   min={customStart || undefined}
+                  max={maxFilterDate}
                   onChange={(e) => setCustomEnd(e.target.value)}
                   className="h-9 w-auto"
                 />
