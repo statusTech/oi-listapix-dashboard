@@ -38,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await signOut(auth);
         return { error: "Usuario sem permissao de acesso a este painel." };
       }
-      const response = await api.post("/authenticateDash", { userKey: credential.user.uid });
+      // ID token = prova do login com senha; o backend não aceita só o uid.
+      const idToken = await credential.user.getIdToken();
+      const response = await api.post("/authenticateDash", { userKey: credential.user.uid, idToken });
       setToken(response.data.token);
       localStorage.setItem("token", response.data.token);
       return { error: null };
