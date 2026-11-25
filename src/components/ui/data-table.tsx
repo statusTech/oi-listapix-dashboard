@@ -64,6 +64,13 @@ export interface DataTableProps<TData, TValue> {
   getRowId?: (row: TData) => string
   /** extra <TableRow>s rendered right after a row (e.g. expanded details) */
   renderSubRows?: (row: TData) => ReactNode
+  /**
+   * Total rows on the server. When set, `data` is only the current page:
+   * the table doesn't slice it, and `paginationState` must be controlled.
+   */
+  rowCount?: number
+  /** extra class per row */
+  rowClassName?: (row: TData) => string | undefined
 }
 
 export function DataTable<TData, TValue>({
@@ -82,7 +89,10 @@ export function DataTable<TData, TValue>({
   mobileCard,
   getRowId,
   renderSubRows,
+  rowCount,
+  rowClassName,
 }: DataTableProps<TData, TValue>) {
+  const serverPagination = rowCount !== undefined
   const [innerSorting, setInnerSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [innerPagination, setInnerPagination] = useState<PaginationState>({
@@ -108,10 +118,11 @@ export function DataTable<TData, TValue>({
     onColumnFiltersChange: setColumnFilters,
     onPaginationChange: setPaginationState,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: pagination ? getPaginationRowModel() : undefined,
+    getPaginationRowModel: pagination && !serverPagination ? getPaginationRowModel() : undefined,
     getSortedRowModel: enableSorting ? getSortedRowModel() : undefined,
     getFilteredRowModel: getFilteredRowModel(),
-    manualPagination: !pagination,
+    manualPagination: !pagination || serverPagination,
+    rowCount,
     autoResetPageIndex: !controlledPagination,
   })
 
@@ -167,7 +178,7 @@ export function DataTable<TData, TValue>({
               <Fragment key={row.id}>
               <TableRow
                 data-state={row.getIsSelected() && "selected"}
-                className={cn(onRowClick && "cursor-pointer")}
+                className={cn(onRowClick && "cursor-pointer", rowClassName?.(row.original))}
                 onClick={() => onRowClick?.(row.original)}
               >
                 {row.getVisibleCells().map((cell) => (
@@ -198,7 +209,7 @@ export function DataTable<TData, TValue>({
         </TableBody>
       </Table>
       </div>
-      {pagination && <DataTablePagination table={table} />}
+      {pagination && <DataTablePagination table={table} total={rowCount} />}
     </div>
   )
 }
