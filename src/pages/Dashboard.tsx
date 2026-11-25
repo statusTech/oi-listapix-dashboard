@@ -208,7 +208,7 @@ function PillToggle<T extends string>({
           className={cn(
             "h-9 whitespace-nowrap px-3 text-sm font-medium transition-colors [&:not(:first-child)]:border-l [&:not(:first-child)]:border-input",
             value === option.value
-              ? "bg-primary text-primary-foreground"
+              ? "bg-oi-blue text-white"
               : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
           )}
         >
@@ -363,10 +363,10 @@ export function Dashboard() {
     }
   }
 
-  if (error) return <p className="p-8 text-red-600">{error}</p>;
+  if (error) return <p className="p-3 text-red-600">{error}</p>;
   if (!data) {
     return (
-      <div className="p-8">
+      <div className="w-full">
         <Skeleton className="h-64 w-full" />
       </div>
     );
@@ -428,7 +428,7 @@ export function Dashboard() {
   );
 
   return (
-    <div className={cn("mx-auto max-w-7xl p-8 transition-opacity", loading && "opacity-60")} aria-busy={loading}>
+    <div className={cn("mx-auto w-full max-w-7xl transition-opacity", loading && "opacity-60")} aria-busy={loading}>
       <div className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-border pb-4">
         <span>
           <span className="text-sm text-neutral-500">Total vendido</span>{" "}
@@ -683,7 +683,7 @@ export function Dashboard() {
         </h2>
         <div className="flex items-center gap-4 text-xs text-neutral-600">
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+            <span className="h-2.5 w-2.5 rounded-full bg-oi-blue" />
             Splitado
           </span>
           <span className="flex items-center gap-1.5">

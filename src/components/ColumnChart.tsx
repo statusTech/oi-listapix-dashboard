@@ -63,7 +63,7 @@ export function ColumnChart({ title, entries, formatValue, note }: ColumnChartPr
                   <div
                     aria-hidden="true"
                     className={`absolute bottom-0 w-full rounded-t transition-[filter] hover:brightness-90 ${
-                      entry.highlighted ? "bg-primary" : "bg-neutral-400"
+                      entry.highlighted ? "bg-oi-blue" : "bg-neutral-400"
                     }`}
                     style={{ height: heightPx }}
                   />

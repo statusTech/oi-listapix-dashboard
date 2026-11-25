@@ -20,18 +20,27 @@ Sem suite de testes — projeto pequeno, somente leitura, verificado via typeche
 ## Arquitetura
 
 - **Stack**: Vite 5 + React 18 + TypeScript 5, Tailwind **v3.4.19** (não v4 — ver seção própria abaixo), shadcn/ui, react-router-dom 6, axios, Firebase Auth (SDK modular v10).
-- **Estrutura**: `src/lib/` (firebase.ts, api.ts, utils.ts) → `src/context/AuthContext.tsx` → `src/components/ProtectedRoute.tsx` + `src/components/ui/*` (shadcn) + `src/components/ClientBarChart.tsx` (gráfico de barra custom, sem lib externa) → `src/pages/Login.tsx` + `Dashboard.tsx` → `src/types/dashboard.ts` (contrato com a API).
+- **Estrutura**: `src/lib/` (firebase.ts, api.ts, utils.ts) → `src/context/AuthContext.tsx` → `src/components/ProtectedRoute.tsx` + `src/components/AppLayout.tsx` + `src/components/{ui,layout}/*` + `src/components/{BarChart,ColumnChart}.tsx` (gráficos próprios; `recharts` já disponível via `ui/chart`) → `src/pages/` (`Login`, `Dashboard`, `ListaNegra`, `logs/`) → `src/types/dashboard.ts` (contrato com a API).
 - **Backend consumido**: `GET /admin/listapix-dashboard/overview` em `server-node-backend` (`src/controllers/ListaPixDashboardController.js`, rota em `src/routes.js` — protegida por `authorize(MASTER)`, só usuário master vê). Local: `http://localhost:3010/api/v1`. Produção: `https://api.oitickets.com.br/api/v1`.
 - **Auth**: Firebase Auth (mesmo projeto `oi-tickets` do `admin.oitickets.com.br`) + `POST /authenticateDash` (troca UID do Firebase por JWT do backend). Allowlist de 2 UIDs master hardcoded em `src/context/AuthContext.tsx:8` (mesma allowlist de `admin/src/service/auth.js:8,18` — mudar em um lugar exige mudar no outro, não há fonte única). Estado "não autenticado" é `token === null` (`AuthContext.tsx`), não um boolean — propositalmente diferente do bug do `admin/` (`authUser === false` nunca verdadeiro).
 - **Interceptor 401** (`src/lib/api.ts`): limpa token e redireciona pra `/login`, exceto quando já está em `/login` (guard adicionado pra não recarregar a página no meio de uma tentativa de login que falha por 401).
 
 ### Tailwind v3, não v4 — decisão deliberada, não desatualização
 
-A CLI `shadcn@latest` atual (v4.x) gera sintaxe exclusiva de Tailwind v4 (`gap-(--var)`, `rounded-4xl`, `--spacing()`) que quebra sob Tailwind v3. Testado e revertido (histórico de commits do repo, mensagens "shadcn/ui" contam a história completa — 3 tentativas). Decisão: **ficar em Tailwind v3** + `shadcn@2.x` pros templates de componente, com dois ajustes manuais necessários porque o *registry* remoto do shadcn (`ui.shadcn.com/r/colors/*.json`) hoje só serve cores em `oklch(...)` completo, não mais tripla HSL:
-- `tailwind.config.cjs`: toda cor usa `oklch(from var(--x) l c h / <alpha-value>)`, não `var(--x)` puro nem `hsl(var(--x))` — `var()` puro quebra silenciosamente todo utilitário de opacidade (`bg-primary/50` etc.), `hsl()` em cima de um valor já-oklch é CSS inválido.
+A CLI `shadcn@latest` atual (v4.x) gera sintaxe exclusiva de Tailwind v4 (`gap-(--var)`, `rounded-4xl`, `--spacing()`) que quebra sob Tailwind v3. Testado e revertido (histórico de commits do repo, mensagens "shadcn/ui" contam a história completa — 3 tentativas). Decisão: **ficar em Tailwind v3**.
+- **Não rodar a CLI do shadcn**: ela sobrescreveria os componentes copiados do admin. Componente novo se copia do `oi-admin` (branch `homologacao`) e se converte pra TSX.
 - `package.json`: `tailwind-merge` tem que ficar em `^2.x`, nunca `^3.x` (v3 do tailwind-merge assume config de classe do Tailwind v4).
 
 Não "resolver" isso migrando pra Tailwind v4 sem avaliar o custo — funciona hoje, é intencional.
+
+### Base visual (igual ao admin novo)
+
+- Cores e tokens vêm do `oi-admin`: `tailwind.config.js` (cores `oi-*`, fonte Open Sans) + `src/index.css` (tokens em tripla HSL, usados como `hsl(var(--x))`). O antigo contorno com `oklch(from ...)` não existe mais.
+- `primary` é um azul quase preto; o azul da marca é `oi-blue`.
+- Layout: `src/components/AppLayout.tsx` (`SidebarProvider` + `layout/AppSidebar` + `layout/Navbar`). Itens do menu e papéis em `src/components/layout/nav.ts`. Estado recolhido da sidebar em `localStorage` (`sidebar:collapsed`).
+- `Toaster` e `TooltipProvider` globais em `src/main.tsx`.
+- Algumas classes copiadas do admin (`shadow-2xs`, `shadow-xs`, `backdrop-blur-xs`, `h-8.5`) não existem no Tailwind 3.4; ficam por paridade com o admin.
+- Empilhamento: a sidebar usa `z-[1200]`; overlays precisam ficar em `z-[1300]` ou mais.
 
 ### Regras de negócio corrigidas pós-implementação (dado real divergiu do plano original)
 

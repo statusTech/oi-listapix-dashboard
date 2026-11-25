@@ -37,17 +37,17 @@ export function ListaNegra() {
     }
   }
 
-  if (error) return <p className="p-8 text-red-600">{error}</p>;
+  if (error) return <p className="p-3 text-red-600">{error}</p>;
   if (!entries) {
     return (
-      <div className="p-8">
+      <div className="w-full">
         <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-7xl p-8">
+    <div className="mx-auto w-full max-w-7xl">
       <h2 className="mb-6 text-lg font-semibold">Lista Negra</h2>
 
       <Table>
