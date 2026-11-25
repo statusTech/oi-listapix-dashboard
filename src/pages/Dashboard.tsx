@@ -102,23 +102,6 @@ function isEventEncerrado(event: EventTotals, today: string) {
   return end < today;
 }
 
-function addDays(dayKey: string, days: number) {
-  const [y, m, d] = dayKey.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
-
-// Limite do filtro: evento mais distante (date_end, ou date_ini sem date_end) + 1 dia.
-function resolveMaxFilterDate(clients: ClientOverview[]) {
-  let max: string | null = null;
-  for (const client of clients) {
-    for (const event of client.events) {
-      const key = eventDayKey(event.date_end) ?? eventDayKey(event.date_ini);
-      if (key && (!max || key > max)) max = key;
-    }
-  }
-  return max ? addDays(max, 1) : undefined;
-}
-
 // Nomes dos query params da rota de overview (período = data da venda, dia de Brasília).
 const PERIOD_PARAM_START = "dateStart";
 const PERIOD_PARAM_END = "dateEnd";
@@ -294,18 +277,6 @@ export function Dashboard() {
   const rangeStart = dateRange?.start;
   const rangeEnd = dateRange?.end;
   const [loading, setLoading] = useState(false);
-  // Com período a API pode omitir eventos sem venda; o limite do filtro precisa de todos os eventos.
-  const [allClients, setAllClients] = useState<ClientOverview[]>([]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    api
-      .get<DashboardOverview>("/admin/listapix-dashboard/overview", { signal: controller.signal })
-      .then((response) => setAllClients(response.data.clients))
-      .catch(() => {});
-    return () => controller.abort();
-  }, []);
-
   useEffect(() => {
     // Personalizado incompleto/inválido: mantém os dados atuais até o período ficar válido.
     if (dateFilter === "custom" && !dateRange) return;
@@ -323,7 +294,8 @@ export function Dashboard() {
       })
       .catch((err) => {
         if (axios.isCancel(err)) return;
-        setError("Não foi possível carregar o dashboard.");
+        const message = (err as { response?: { data?: { message?: unknown } } })?.response?.data?.message;
+        setError(typeof message === "string" && message ? message : "Não foi possível carregar o dashboard.");
         setLoading(false);
       });
     return () => controller.abort();
@@ -410,7 +382,6 @@ export function Dashboard() {
   const invalidCustomRange = dateFilter === "custom" && customStart !== "" && customEnd !== "" && customStart > customEnd;
 
   const today = brtTodayKey();
-  const maxFilterDate = resolveMaxFilterDate([...data.clients, ...allClients]);
 
   function keepEvent(event: EventTotals) {
     if (dateRange && !eventHasSalesInPeriod(event)) return false;
@@ -531,7 +502,7 @@ export function Dashboard() {
                   type="date"
                   aria-label="Data inicial"
                   value={customStart}
-                  max={maxFilterDate}
+                  max={today}
                   onChange={(e) => {
                     const value = e.target.value;
                     setCustomStart(value);
@@ -546,7 +517,7 @@ export function Dashboard() {
                   aria-label="Data final"
                   value={customEnd}
                   min={customStart || undefined}
-                  max={maxFilterDate}
+                  max={today}
                   onChange={(e) => setCustomEnd(e.target.value)}
                   className="h-9 w-auto"
                 />
