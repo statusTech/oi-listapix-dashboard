@@ -36,10 +36,10 @@ export function DataTablePagination<TData>({ table }: { table: Table<TData> }) {
         </Select>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <span className="text-sm text-muted-foreground">
           Página {table.getState().pagination.pageIndex + 1} de{" "}
-          {table.getPageCount()}
+          {Math.max(1, table.getPageCount())}
         </span>
         <div className="flex items-center gap-1">
           <Button
