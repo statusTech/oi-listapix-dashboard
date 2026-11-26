@@ -1,21 +1,28 @@
-import { useEffect, useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Skeleton } from "../../components/ui/skeleton";
-import { Pagination } from "../../components/Pagination";
-import { FilterField, FilterSelect } from "../../components/FilterField";
-import { api } from "../../lib/api";
-import { cleanParams, defaultPeriod, errorMessage, formatDateTime, useClientOptions } from "../../lib/logs";
-import type { IngressoLog, IngressosFilters, Paginated } from "../../types/logs";
-import { cn } from "@/lib/utils";
+import type { ColumnDef } from "@tanstack/react-table";
+import SectionCard from "@/components/layout/SectionCard";
+import { Badge } from "@/components/ui/badge";
+import { defaultPeriod, formatDateTime, useClientOptions } from "@/lib/logs";
+import type {
+  IngressoChannel,
+  IngressoLog,
+  IngressoOrigin,
+  IngressoProvider,
+  IngressoStatus,
+  IngressosFilters,
+} from "@/types/logs";
+import { BadgeTooltip } from "./BadgeTooltip";
+import { FiltersForm, SelectFilter, TextFilter } from "./filters";
+import { LogsTable } from "./LogsTable";
+import { useServerLogs } from "./useServerLogs";
 
-const PAGE_SIZE = 50;
+const STATUS_LABEL: Record<IngressoStatus, string> = { success: "Enviado", failed: "Falhou" };
+const CHANNEL_LABEL: Record<IngressoChannel, string> = { whatsapp: "WhatsApp", email: "E-mail" };
+const ORIGIN_LABEL: Record<IngressoOrigin, string> = { store: "Loja", panel: "Painel" };
+const PROVIDER_LABEL: Record<IngressoProvider, string> = { smsbarato: "SMS Barato", zapi: "Z-API", email: "E-mail" };
 
-const CHANNEL_LABEL = { whatsapp: "WhatsApp", email: "E-mail" } as const;
-const ORIGIN_LABEL = { store: "Loja", panel: "Painel" } as const;
-const PROVIDER_LABEL = { smsbarato: "SMS Barato", zapi: "Z-API", email: "E-mail" } as const;
+function toOptions<T extends string>(labels: Record<T, string>) {
+  return (Object.entries(labels) as [T, string][]).map(([value, label]) => ({ value, label }));
+}
 
 function defaultFilters(): IngressosFilters {
   return {
@@ -30,195 +37,122 @@ function defaultFilters(): IngressosFilters {
   };
 }
 
+const nowrap = (value: string) => <span className="whitespace-nowrap">{value}</span>;
+const wrapping = (value: string) => <span className="block min-w-[9rem]">{value}</span>;
+
+const columns: ColumnDef<IngressoLog>[] = [
+  { id: "date", header: "Data", cell: ({ row }) => nowrap(formatDateTime(row.original.sent_at)) },
+  { id: "client", header: "Cliente", cell: ({ row }) => wrapping(row.original.client.name ?? "—") },
+  { id: "event", header: "Evento", cell: ({ row }) => wrapping(row.original.event.name) },
+  { id: "order", header: "Pedido", cell: ({ row }) => nowrap(row.original.reference ?? row.original.order_id) },
+  { id: "buyer", header: "Comprador", cell: ({ row }) => wrapping(row.original.buyer_name) },
+  { id: "recipient", header: "Destinatário", cell: ({ row }) => nowrap(row.original.recipient) },
+  { id: "channel", header: "Canal", cell: ({ row }) => CHANNEL_LABEL[row.original.channel] },
+  { id: "origin", header: "Origem", cell: ({ row }) => ORIGIN_LABEL[row.original.origin] },
+  { id: "provider", header: "Provedor", cell: ({ row }) => nowrap(PROVIDER_LABEL[row.original.provider]) },
+  {
+    id: "fallback",
+    header: "Fallback",
+    cell: ({ row }) => {
+      const { used_fallback, fallback_reason } = row.original;
+      const label = used_fallback ? "Sim" : "Não";
+      if (fallback_reason) {
+        return <BadgeTooltip label={label} text={fallback_reason.text} code={fallback_reason.code} variant="outline" />;
+      }
+      return used_fallback ? <Badge variant="outline">{label}</Badge> : label;
+    },
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: ({ row }) => (
+      <Badge variant={row.original.status === "failed" ? "destructive" : "secondary"}>
+        {STATUS_LABEL[row.original.status]}
+      </Badge>
+    ),
+  },
+  {
+    id: "error",
+    header: "Erro",
+    cell: ({ row }) => {
+      const { error } = row.original;
+      return error ? <BadgeTooltip label={error.text} text={error.text} code={error.code} variant="destructive" /> : "—";
+    },
+  },
+];
+
 export function LogsIngressos() {
-  const [filters, setFilters] = useState<IngressosFilters>(defaultFilters);
-  const [applied, setApplied] = useState<IngressosFilters>(filters);
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<Paginated<IngressoLog> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const logs = useServerLogs<IngressosFilters, IngressoLog>(
+    "/admin/listapix-dashboard/logs/ingressos",
+    defaultFilters,
+    "Não foi possível carregar os logs de ingressos.",
+  );
+  const { filters, setFilter } = logs;
   const clients = useClientOptions();
 
-  useEffect(() => {
-    let cancelled = false;
-    setData(null);
-    setError(null);
-    api
-      .get<Paginated<IngressoLog>>("/admin/listapix-dashboard/logs/ingressos", {
-        params: cleanParams({ ...applied, page, limit: PAGE_SIZE }),
-      })
-      .then((res) => !cancelled && setData(res.data))
-      .catch((err) => !cancelled && setError(errorMessage(err, "Não foi possível carregar os logs de ingressos.")));
-    return () => {
-      cancelled = true;
-    };
-  }, [applied, page, reloadKey]);
-
-  function set<K extends keyof IngressosFilters>(key: K, value: IngressosFilters[K]) {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function search() {
-    setPage(1);
-    setApplied(filters);
-    setReloadKey((k) => k + 1);
-  }
-
-  function clearFilters() {
-    const fresh = defaultFilters();
-    setFilters(fresh);
-    setPage(1);
-    setApplied(fresh);
-  }
-
   return (
-    <div className="mx-auto w-full max-w-7xl">
-      <h2 className="mb-6 text-lg font-semibold">Logs · Ingressos</h2>
-
-      <form
-        className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          search();
-        }}
-      >
-        <FilterField label="De">
-          <Input type="date" value={filters.dateStart} onChange={(e) => set("dateStart", e.target.value)} />
-        </FilterField>
-        <FilterField label="Até">
-          <Input type="date" value={filters.dateEnd} onChange={(e) => set("dateEnd", e.target.value)} />
-        </FilterField>
-        <FilterField label="Cliente">
-          <FilterSelect value={filters.clientId} onChange={(e) => set("clientId", e.target.value)}>
-            <option value="">Todos</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </FilterSelect>
-        </FilterField>
-        <FilterField label="Evento">
-          <Input
+    <div className="mx-auto w-full min-w-0 max-w-7xl">
+      <SectionCard title="Logs · Ingressos" className="min-w-0">
+        <FiltersForm onSearch={logs.search} onClear={logs.clear}>
+          <TextFilter label="De" type="date" value={filters.dateStart} onChange={(v) => setFilter("dateStart", v)} />
+          <TextFilter label="Até" type="date" value={filters.dateEnd} onChange={(v) => setFilter("dateEnd", v)} />
+          <SelectFilter
+            label="Cliente"
+            value={filters.clientId}
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            onChange={(v) => setFilter("clientId", v)}
+          />
+          <TextFilter
+            label="Evento"
             placeholder="Nome do evento"
             value={filters.eventName}
-            onChange={(e) => set("eventName", e.target.value)}
+            onChange={(v) => setFilter("eventName", v)}
           />
-        </FilterField>
-        <FilterField label="Status">
-          <FilterSelect value={filters.status} onChange={(e) => set("status", e.target.value as IngressosFilters["status"])}>
-            <option value="">Todos</option>
-            <option value="success">Enviado</option>
-            <option value="failed">Falhou</option>
-          </FilterSelect>
-        </FilterField>
-        <FilterField label="Canal">
-          <FilterSelect value={filters.channel} onChange={(e) => set("channel", e.target.value as IngressosFilters["channel"])}>
-            <option value="">Todos</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="email">E-mail</option>
-          </FilterSelect>
-        </FilterField>
-        <FilterField label="Origem">
-          <FilterSelect value={filters.origin} onChange={(e) => set("origin", e.target.value as IngressosFilters["origin"])}>
-            <option value="">Todas</option>
-            <option value="store">Loja</option>
-            <option value="panel">Painel</option>
-          </FilterSelect>
-        </FilterField>
-        <FilterField label="Provedor">
-          <FilterSelect value={filters.provider} onChange={(e) => set("provider", e.target.value as IngressosFilters["provider"])}>
-            <option value="">Todos</option>
-            <option value="smsbarato">SMS Barato</option>
-            <option value="zapi">Z-API</option>
-            <option value="email">E-mail</option>
-          </FilterSelect>
-        </FilterField>
-        <FilterField label="Erro (código ou texto)">
-          <Input placeholder="Ex.: SMSBARATO_NUMERO_EXCLUIDO" value={filters.error} onChange={(e) => set("error", e.target.value)} />
-        </FilterField>
-        <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-3 lg:justify-end">
-          <Button type="button" variant="outline" onClick={clearFilters}>
-            Limpar filtros
-          </Button>
-          <Button type="submit">Buscar</Button>
-        </div>
-      </form>
+          <SelectFilter
+            label="Status"
+            value={filters.status}
+            options={toOptions(STATUS_LABEL)}
+            onChange={(v) => setFilter("status", v)}
+          />
+          <SelectFilter
+            label="Canal"
+            value={filters.channel}
+            options={toOptions(CHANNEL_LABEL)}
+            onChange={(v) => setFilter("channel", v)}
+          />
+          <SelectFilter
+            label="Origem"
+            allLabel="Todas"
+            value={filters.origin}
+            options={toOptions(ORIGIN_LABEL)}
+            onChange={(v) => setFilter("origin", v)}
+          />
+          <SelectFilter
+            label="Provedor"
+            value={filters.provider}
+            options={toOptions(PROVIDER_LABEL)}
+            onChange={(v) => setFilter("provider", v)}
+          />
+          <TextFilter
+            label="Erro (código ou texto)"
+            placeholder="Ex.: SMSBARATO_NUMERO_EXCLUIDO"
+            value={filters.error}
+            onChange={(v) => setFilter("error", v)}
+          />
+        </FiltersForm>
 
-      {error ? (
-        <div className="rounded-md border border-red-200 p-4 text-sm text-red-600">
-          <p>{error}</p>
-          <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setReloadKey((k) => k + 1)}>
-            Tentar novamente
-          </Button>
-        </div>
-      ) : !data ? (
-        <Skeleton className="h-64 w-full" />
-      ) : (
-        <>
-          <div className="overflow-x-auto rounded-md border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Evento</TableHead>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Comprador</TableHead>
-                  <TableHead>Destinatário</TableHead>
-                  <TableHead>Canal</TableHead>
-                  <TableHead>Origem</TableHead>
-                  <TableHead>Provedor</TableHead>
-                  <TableHead>Fallback</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Erro</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.items.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={12} className="text-center text-sm text-neutral-500">
-                      Nenhum log no período
-                    </TableCell>
-                  </TableRow>
-                )}
-                {data.items.map((log) => (
-                  <TableRow key={log.id} className={cn(log.status === "failed" && "bg-red-50 hover:bg-red-100")}>
-                    <TableCell className="whitespace-nowrap">
-                      {formatDateTime(log.sent_at)}
-                    </TableCell>
-                    <TableCell>{log.client.name ?? "—"}</TableCell>
-                    <TableCell>{log.event.name}</TableCell>
-                    <TableCell className="whitespace-nowrap">{log.reference ?? log.order_id}</TableCell>
-                    <TableCell>{log.buyer_name}</TableCell>
-                    <TableCell className="whitespace-nowrap">{log.recipient}</TableCell>
-                    <TableCell>{CHANNEL_LABEL[log.channel]}</TableCell>
-                    <TableCell>{ORIGIN_LABEL[log.origin]}</TableCell>
-                    <TableCell>{PROVIDER_LABEL[log.provider]}</TableCell>
-                    <TableCell title={log.fallback_reason?.text}>{log.used_fallback ? "Sim" : "Não"}</TableCell>
-                    <TableCell>
-                      <Badge variant={log.status === "failed" ? "destructive" : "secondary"}>
-                        {log.status === "failed" ? "Falhou" : "Enviado"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="min-w-56">
-                      {log.error ? (
-                        <>
-                          <p className="text-sm text-red-700">{log.error.text}</p>
-                          <p className="font-mono text-xs text-neutral-500">{log.error.code}</p>
-                        </>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <Pagination page={data.page} pageSize={data.limit} total={data.total} onChange={setPage} />
-        </>
-      )}
+        <LogsTable
+          columns={columns}
+          data={logs.data}
+          loading={logs.loading}
+          error={logs.error}
+          onRetry={logs.retry}
+          pagination={logs.pagination}
+          onPaginationChange={logs.onPaginationChange}
+          getRowId={(log) => log.id}
+          rowClassName={(log) => (log.status === "failed" ? "bg-red-50 hover:bg-red-100" : undefined)}
+        />
+      </SectionCard>
     </div>
   );
 }
