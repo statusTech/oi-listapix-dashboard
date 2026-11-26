@@ -64,7 +64,7 @@ export function BarChart({ title, entries, formatValue, note }: BarChartProps) {
                   <div
                     aria-hidden="true"
                     className={`flex h-5 items-center justify-end rounded-r-sm pr-2 transition-[filter] group-hover:brightness-90 ${
-                      entry.highlighted ? "bg-primary" : "bg-neutral-400"
+                      entry.highlighted ? "bg-oi-blue" : "bg-neutral-400"
                     }`}
                     style={{ width: `${widthPct}%` }}
                   >
