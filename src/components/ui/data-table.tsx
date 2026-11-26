@@ -17,7 +17,7 @@
  * <DataTable columns={columns} data={rows} onRowClick={(row) => console.log(row)} />
  */
 
-import { useState, type ReactNode } from "react"
+import { Fragment, useState, type ReactNode } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -60,6 +60,10 @@ export interface DataTableProps<TData, TValue> {
   paginationState?: PaginationState
   onPaginationChange?: OnChangeFn<PaginationState>
   mobileCard?: (row: TData) => ReactNode
+  /** stable row key (default: row index) */
+  getRowId?: (row: TData) => string
+  /** extra <TableRow>s rendered right after a row (e.g. expanded details) */
+  renderSubRows?: (row: TData) => ReactNode
 }
 
 export function DataTable<TData, TValue>({
@@ -76,6 +80,8 @@ export function DataTable<TData, TValue>({
   paginationState: controlledPagination,
   onPaginationChange,
   mobileCard,
+  getRowId,
+  renderSubRows,
 }: DataTableProps<TData, TValue>) {
   const [innerSorting, setInnerSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -92,6 +98,7 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
+    getRowId,
     state: {
       sorting: sortingState,
       columnFilters,
@@ -133,7 +140,16 @@ export function DataTable<TData, TValue>({
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+                <TableHead
+                  key={header.id}
+                  aria-sort={
+                    header.column.getIsSorted() === "asc"
+                      ? "ascending"
+                      : header.column.getIsSorted() === "desc"
+                        ? "descending"
+                        : undefined
+                  }
+                >
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -148,8 +164,8 @@ export function DataTable<TData, TValue>({
         <TableBody>
           {table.getRowModel().rows?.length ? (
             table.getRowModel().rows.map((row) => (
+              <Fragment key={row.id}>
               <TableRow
-                key={row.id}
                 data-state={row.getIsSelected() && "selected"}
                 className={cn(onRowClick && "cursor-pointer")}
                 onClick={() => onRowClick?.(row.original)}
@@ -166,6 +182,8 @@ export function DataTable<TData, TValue>({
                   </TableCell>
                 ))}
               </TableRow>
+              {renderSubRows?.(row.original)}
+              </Fragment>
             ))
           ) : (
             <TableRow>

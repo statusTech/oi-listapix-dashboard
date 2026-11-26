@@ -64,6 +64,7 @@ export default function PillToggle<T extends string | number>({
               key={opt.value}
               type="button"
               disabled={opt.disabled}
+              aria-pressed={active}
               onClick={() => !opt.disabled && onChange(opt.value)}
               className={cn(
                 'appearance-none border-0 outline-none rounded-full cursor-pointer transition-colors flex items-center gap-1.5',
