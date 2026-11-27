@@ -1,4 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
+import { PageLayout } from "@/components/layout/PageLayout";
 import SectionCard from "@/components/layout/SectionCard";
 import { Badge } from "@/components/ui/badge";
 import { defaultPeriod, formatDateTime, useClientOptions } from "@/lib/logs";
@@ -66,7 +67,11 @@ const columns: ColumnDef<IngressoLog>[] = [
     id: "status",
     header: "Status",
     cell: ({ row }) => (
-      <Badge variant={row.original.status === "failed" ? "destructive" : "secondary"}>
+      <Badge
+        variant={row.original.status === "failed" ? "destructive" : "secondary"}
+        // O cinza padrão do "secondary" some na linha zebrada.
+        className={row.original.status === "failed" ? undefined : "bg-oi-border hover:bg-oi-border"}
+      >
         {STATUS_LABEL[row.original.status]}
       </Badge>
     ),
@@ -91,8 +96,10 @@ export function LogsIngressos() {
   const clients = useClientOptions();
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl">
-      <SectionCard title="Logs · Ingressos" className="min-w-0">
+    <PageLayout
+      breadcrumb={[{ label: "Dashboard", to: "/" }, { label: "Logs", to: "/logs" }, { label: "Ingressos" }]}
+      title="Ingressos"
+      filters={
         <FiltersForm onSearch={logs.search} onClear={logs.clear}>
           <TextFilter label="De" type="date" value={filters.dateStart} onChange={(v) => setFilter("dateStart", v)} />
           <TextFilter label="Até" type="date" value={filters.dateEnd} onChange={(v) => setFilter("dateEnd", v)} />
@@ -135,12 +142,15 @@ export function LogsIngressos() {
           />
           <TextFilter
             label="Erro (código ou texto)"
+            className="w-72"
             placeholder="Ex.: SMSBARATO_NUMERO_EXCLUIDO"
             value={filters.error}
             onChange={(v) => setFilter("error", v)}
           />
         </FiltersForm>
-
+      }
+    >
+      <SectionCard className="min-w-0">
         <LogsTable
           columns={columns}
           data={logs.data}
@@ -153,6 +163,6 @@ export function LogsIngressos() {
           rowClassName={(log) => (log.status === "failed" ? "bg-red-50 hover:bg-red-100" : undefined)}
         />
       </SectionCard>
-    </div>
+    </PageLayout>
   );
 }

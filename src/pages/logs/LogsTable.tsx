@@ -64,7 +64,7 @@ export function LogsTable<TItem>({
         rowClassName={rowClassName}
         empty="Nenhum log no período"
         className="[&_td]:px-2 [&_td]:py-3 [&_th]:whitespace-nowrap [&_th]:px-2"
-        numberCellClassName="text-[13px] tabular-nums"
+        numberCellClassName="tabular-nums"
       />
     </div>
   );

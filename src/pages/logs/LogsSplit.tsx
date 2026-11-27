@@ -1,4 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
+import { PageLayout } from "@/components/layout/PageLayout";
 import SectionCard from "@/components/layout/SectionCard";
 import { defaultPeriod, formatDateTime, useClientOptions } from "@/lib/logs";
 import { formatCurrency, formatDayKey } from "@/pages/home/utils";
@@ -39,19 +40,17 @@ export function LogsSplit() {
   const clients = useClientOptions();
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl">
-      <SectionCard
-        title="Logs · Split"
-        className="min-w-0"
-        headerClassName="flex-wrap"
-        headerRight={
-          data && (
-            <span className="text-xs tabular-nums text-oi-text-muted">
-              Período: {formatDayKey(data.period.dateStart)} a {formatDayKey(data.period.dateEnd)}
-            </span>
-          )
-        }
-      >
+    <PageLayout
+      breadcrumb={[{ label: "Dashboard", to: "/" }, { label: "Logs", to: "/logs" }, { label: "Split" }]}
+      title="Split"
+      titleRight={
+        data && (
+          <span className="text-xs tabular-nums text-oi-text-muted">
+            Período: {formatDayKey(data.period.dateStart)} a {formatDayKey(data.period.dateEnd)}
+          </span>
+        )
+      }
+      filters={
         <FiltersForm onSearch={logs.search} onClear={logs.clear}>
           <TextFilter label="De" type="date" value={filters.dateStart} onChange={(v) => setFilter("dateStart", v)} />
           <TextFilter label="Até" type="date" value={filters.dateEnd} onChange={(v) => setFilter("dateEnd", v)} />
@@ -74,7 +73,9 @@ export function LogsSplit() {
             onChange={(v) => setFilter("reason", v)}
           />
         </FiltersForm>
-
+      }
+    >
+      <SectionCard className="min-w-0">
         <LogsTable
           columns={columns}
           data={data}
@@ -86,6 +87,6 @@ export function LogsSplit() {
           getRowId={(log) => String(log.id)}
         />
       </SectionCard>
-    </div>
+    </PageLayout>
   );
 }

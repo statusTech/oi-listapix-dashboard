@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { functionalUpdate, type OnChangeFn, type PaginationState, type SortingState } from "@tanstack/react-table";
-import { CircleDollarSign, Percent, Search, Split, Unplug, Users, X } from "lucide-react";
+import { CircleDollarSign, Percent, Split, Unplug, Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import type { ClientOverview, DashboardOverview } from "@/types/dashboard";
 import KpiCard from "@/components/layout/KpiCard";
+import { PageLayout } from "@/components/layout/PageLayout";
 import SectionCard from "@/components/layout/SectionCard";
 import {
   AlertDialog,
@@ -18,7 +19,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientsTable } from "./home/ClientsTable";
 import { Filters } from "./home/Filters";
@@ -179,8 +179,27 @@ export function Dashboard() {
   });
 
   return (
-    <div className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-3" aria-busy={loading}>
-      <div className={cn("grid grid-cols-2 gap-3 transition-opacity lg:grid-cols-5", loading && data && "opacity-60")}>
+    <PageLayout
+      breadcrumb={[{ label: "Dashboard", to: "/" }, { label: "Home" }]}
+      title="Home"
+      busy={loading}
+      filters={
+        <Filters
+          filters={filters}
+          today={today}
+          onChange={updateFilters}
+          onClear={
+            hasActiveFilters
+              ? () => {
+                  setFilters(DEFAULT_FILTERS);
+                  toFirstPage();
+                }
+              : undefined
+          }
+        />
+      }
+    >
+      <div className={cn("grid grid-cols-2 gap-4 transition-opacity lg:grid-cols-5", loading && data && "opacity-60")}>
         <KpiCard
           label="Total vendido"
           variant="primary"
@@ -224,52 +243,7 @@ export function Dashboard() {
         />
       </div>
 
-      <SectionCard
-        title="Clientes"
-        className="min-w-0"
-        headerClassName="flex-wrap"
-        headerRightClassName="w-full sm:w-auto"
-        headerRight={
-          <div className="relative w-full sm:w-64">
-            <Search
-              className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <Input
-              value={filters.search}
-              onChange={(e) => updateFilters({ search: e.target.value })}
-              placeholder="Buscar cliente..."
-              aria-label="Buscar cliente por nome"
-              className="h-9 pl-8 text-[13px]"
-            />
-          </div>
-        }
-      >
-        <Filters filters={filters} today={today} onChange={updateFilters} />
-
-        <div className="flex min-h-7 flex-wrap items-center gap-2">
-          {data && (
-            <span className="text-xs tabular-nums text-oi-text-muted">
-              {clients.length} de {data.clients.length} {data.clients.length === 1 ? "cliente" : "clientes"}
-            </span>
-          )}
-          {hasActiveFilters && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 text-xs"
-              onClick={() => {
-                setFilters(DEFAULT_FILTERS);
-                toFirstPage();
-              }}
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-              Limpar filtros
-            </Button>
-          )}
-        </div>
-
+      <SectionCard className="min-w-0">
         {firstLoad ? (
           <div className="flex flex-col gap-2">
             {Array.from({ length: 5 }, (_, i) => (
@@ -296,10 +270,15 @@ export function Dashboard() {
             />
           </div>
         )}
+        {data && (
+          <span className="text-xs tabular-nums text-oi-text-muted">
+            {clients.length} de {data.clients.length} {data.clients.length === 1 ? "cliente" : "clientes"}
+          </span>
+        )}
       </SectionCard>
 
       {!loadError && (
-        <div className={cn("grid grid-cols-1 gap-3 transition-opacity xl:grid-cols-2", loading && data && "opacity-60")}>
+        <div className={cn("grid grid-cols-1 gap-4 transition-opacity xl:grid-cols-2", loading && data && "opacity-60")}>
           <BarsCard
             title="Total vendido"
             entries={clientEntries((c) => c.totalVendido)}
@@ -346,6 +325,6 @@ export function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageLayout>
   );
 }
