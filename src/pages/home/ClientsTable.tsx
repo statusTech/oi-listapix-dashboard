@@ -129,7 +129,8 @@ const columns: ColumnDef<ClientOverview>[] = [
     cell: ({ row }) => (
       <Badge
         variant={row.original.split ? "default" : "secondary"}
-        className={cn(row.original.split && "bg-oi-blue hover:bg-oi-blue")}
+        // O cinza padrão do "secondary" some na linha zebrada.
+        className={row.original.split ? "bg-oi-blue hover:bg-oi-blue" : "bg-oi-border hover:bg-oi-border"}
       >
         {row.original.split ? "Sim" : "Não"}
       </Badge>
@@ -147,9 +148,10 @@ const columns: ColumnDef<ClientOverview>[] = [
 function EventRow({ event, today }: { event: EventTotals; today: string }) {
   const day = eventDayKey(event.date_ini);
   const encerrado = isEventEncerrado(event, today);
+  // Fundo branco e filete azul: o cinza agora é da zebra das linhas de cliente.
   return (
-    <TableRow className="bg-oi-zebra text-[13px] hover:bg-oi-zebra">
-      <TableCell className="!pl-8 text-oi-text-muted">
+    <TableRow className="bg-white hover:bg-white">
+      <TableCell className="border-l-2 border-l-oi-blue !pl-8 text-oi-text-muted">
         {event.name}
         {day && <span className="ml-2 text-xs">{formatDayKey(day)}</span>}
       </TableCell>
@@ -207,7 +209,7 @@ export function ClientsTable({ clients, today, onExclude, sorting, onSortingChan
         data={clients}
         // Só a primeira coluna quebra linha; assim a tabela cabe no desktop.
         className="[&_td:first-child]:min-w-[11rem] [&_td:first-child]:whitespace-normal [&_td]:whitespace-nowrap [&_td]:px-2 [&_td]:py-3 [&_th]:px-2 [&_th_button]:h-auto [&_th_button]:gap-0 [&_th_button]:whitespace-normal [&_th_button]:py-1 [&_th_button]:text-left"
-        numberCellClassName="text-[13px] tabular-nums"
+        numberCellClassName="tabular-nums"
         empty="Nenhum cliente encontrado."
         getRowId={(client) => client.clientId}
         onRowClick={(client) => toggleExpanded(client.clientId)}

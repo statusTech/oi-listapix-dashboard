@@ -145,7 +145,7 @@ export function DataTable<TData, TValue>({
           )}
         </div>
       )}
-      <div className={cn(mobileCard && "max-md:hidden")}>
+      <div className={cn("overflow-hidden rounded-md border border-oi-border", mobileCard && "max-md:hidden")}>
       <Table className={className}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -174,19 +174,24 @@ export function DataTable<TData, TValue>({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
+            table.getRowModel().rows.map((row, index) => (
               <Fragment key={row.id}>
               <TableRow
                 data-state={row.getIsSelected() && "selected"}
-                className={cn(onRowClick && "cursor-pointer", rowClassName?.(row.original))}
+                // Zebra pelo índice, não por :nth-child: as sub-linhas não deslocam a alternância.
+                className={cn(
+                  index % 2 === 0 && "bg-oi-zebra hover:bg-[#e8ecf3]",
+                  onRowClick && "cursor-pointer",
+                  rowClassName?.(row.original)
+                )}
                 onClick={() => onRowClick?.(row.original)}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell 
                     key={cell.id}
                     className={cn(
-                      !Number.isNaN(Number(cell.getValue())) ? numberCellClassName : 'text-[13px]',
-                      'max-md:text-sm'
+                      'text-sm',
+                      !Number.isNaN(Number(cell.getValue())) && numberCellClassName
                     )}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

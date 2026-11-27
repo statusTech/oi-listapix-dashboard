@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import type { ColumnDef } from "@tanstack/react-table";
 import { RotateCcw } from "lucide-react";
+import { PageLayout } from "@/components/layout/PageLayout";
 import SectionCard from "@/components/layout/SectionCard";
 import {
   AlertDialog,
@@ -100,8 +101,8 @@ export function ListaNegra() {
   );
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-7xl">
-      <SectionCard title="Lista Negra" className="min-w-0">
+    <PageLayout breadcrumb={[{ label: "Dashboard", to: "/" }, { label: "Lista Negra" }]} title="Lista Negra">
+      <SectionCard className="min-w-0">
         {loadError ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-oi-border p-4">
             <span className="text-sm text-destructive">{loadError}</span>
@@ -121,7 +122,7 @@ export function ListaNegra() {
             data={entries}
             getRowId={(entry) => entry.clientId}
             empty="Nenhum cliente na lista negra."
-            numberCellClassName="text-[13px] tabular-nums"
+            numberCellClassName="tabular-nums"
           />
         )}
       </SectionCard>
@@ -140,6 +141,6 @@ export function ListaNegra() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageLayout>
   );
 }
